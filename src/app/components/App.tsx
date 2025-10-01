@@ -177,7 +177,9 @@ function CreateSettlement(props: CreateSettlementProps) {
           sx={{ width: "150px" }}
         >
           {props.state.players?.map((player) => (
-            <MenuItem value={player}>{player}</MenuItem>
+            <MenuItem key={`create-settlement-${player}`} value={player}>
+              {player}
+            </MenuItem>
           ))}
         </Select>
       </FormControl>
@@ -193,7 +195,9 @@ function CreateSettlement(props: CreateSettlementProps) {
             sx={{ width: "150px" }}
           >
             {resources.map((resource) => (
-              <MenuItem value={resource}>{resourceNames[resource]}</MenuItem>
+              <MenuItem key={`resource-1-${resource}`} value={resource}>
+                {resourceNames[resource]}
+              </MenuItem>
             ))}
           </Select>
         </FormControl>
@@ -208,7 +212,9 @@ function CreateSettlement(props: CreateSettlementProps) {
             sx={{ width: "150px" }}
           >
             {diceOutcomes.map((number) => (
-              <MenuItem value={number}>{number}</MenuItem>
+              <MenuItem key={`chip-1-${number}`} value={number}>
+                {number}
+              </MenuItem>
             ))}
           </Select>
         </FormControl>
@@ -225,7 +231,7 @@ function CreateSettlement(props: CreateSettlementProps) {
             sx={{ width: "150px" }}
           >
             {resources.map((resource) => (
-              <MenuItem value={resource}>{resourceNames[resource]}</MenuItem>
+              <MenuItem key={`resource-2-${resource}`} value={resource}>{resourceNames[resource]}</MenuItem>
             ))}
           </Select>
         </FormControl>
@@ -240,7 +246,7 @@ function CreateSettlement(props: CreateSettlementProps) {
             sx={{ width: "150px" }}
           >
             {diceOutcomes.map((number) => (
-              <MenuItem value={number}>{number}</MenuItem>
+              <MenuItem key={`chip-2-${number}`} value={number}>{number}</MenuItem>
             ))}
           </Select>
         </FormControl>
@@ -257,7 +263,7 @@ function CreateSettlement(props: CreateSettlementProps) {
             sx={{ width: "150px" }}
           >
             {resources.map((resource) => (
-              <MenuItem value={resource}>{resourceNames[resource]}</MenuItem>
+              <MenuItem key={`resource-3-${resource}`} value={resource}>{resourceNames[resource]}</MenuItem>
             ))}
           </Select>
         </FormControl>
@@ -272,7 +278,7 @@ function CreateSettlement(props: CreateSettlementProps) {
             sx={{ width: "150px" }}
           >
             {diceOutcomes.map((number) => (
-              <MenuItem value={number}>{number}</MenuItem>
+              <MenuItem key={`chip-3-${number}`} value={number}>{number}</MenuItem>
             ))}
           </Select>
         </FormControl>
