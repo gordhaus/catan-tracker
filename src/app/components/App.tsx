@@ -24,15 +24,30 @@ import {
   updateState,
 } from "../localStorage";
 import styles from "../page.module.css";
+import { BarChart } from "@mui/x-charts";
 
 const diceOutcomes = [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12] as const;
 type DiceOutcome = (typeof diceOutcomes)[number];
+
+const probabilities: Record<DiceOutcome, number> = {
+  2: 1,
+  3: 2,
+  4: 3,
+  5: 4,
+  6: 5,
+  7: 6,
+  8: 5,
+  9: 4,
+  10: 3,
+  11: 2,
+  12: 1,
+};
 
 const resources = ["WHEAT", "ORE", "WOOD", "CLAY", "WOOL", "GOLD"] as const;
 type Resource = (typeof resources)[number];
 
 interface Income {
-  resource: "WHEAT" | "ORE" | "WOOD" | "CLAY" | "WOOL" | "GOLD";
+  resource: Resource;
   number: DiceOutcome;
 }
 
@@ -231,7 +246,9 @@ function CreateSettlement(props: CreateSettlementProps) {
             sx={{ width: "150px" }}
           >
             {resources.map((resource) => (
-              <MenuItem key={`resource-2-${resource}`} value={resource}>{resourceNames[resource]}</MenuItem>
+              <MenuItem key={`resource-2-${resource}`} value={resource}>
+                {resourceNames[resource]}
+              </MenuItem>
             ))}
           </Select>
         </FormControl>
@@ -246,7 +263,9 @@ function CreateSettlement(props: CreateSettlementProps) {
             sx={{ width: "150px" }}
           >
             {diceOutcomes.map((number) => (
-              <MenuItem key={`chip-2-${number}`} value={number}>{number}</MenuItem>
+              <MenuItem key={`chip-2-${number}`} value={number}>
+                {number}
+              </MenuItem>
             ))}
           </Select>
         </FormControl>
@@ -263,7 +282,9 @@ function CreateSettlement(props: CreateSettlementProps) {
             sx={{ width: "150px" }}
           >
             {resources.map((resource) => (
-              <MenuItem key={`resource-3-${resource}`} value={resource}>{resourceNames[resource]}</MenuItem>
+              <MenuItem key={`resource-3-${resource}`} value={resource}>
+                {resourceNames[resource]}
+              </MenuItem>
             ))}
           </Select>
         </FormControl>
@@ -278,7 +299,9 @@ function CreateSettlement(props: CreateSettlementProps) {
             sx={{ width: "150px" }}
           >
             {diceOutcomes.map((number) => (
-              <MenuItem key={`chip-3-${number}`} value={number}>{number}</MenuItem>
+              <MenuItem key={`chip-3-${number}`} value={number}>
+                {number}
+              </MenuItem>
             ))}
           </Select>
         </FormControl>
@@ -472,6 +495,88 @@ function IngameInterface(props: {
         </div>
       ))}
       <Divider />
+      <h2>Statistiken</h2>
+      <h3>Würfel</h3>
+      <BarChart
+        barLabel={"value"}
+        layout="horizontal"
+        height={500}
+        yAxis={[{ data: diceOutcomes }]}
+        series={[
+          {
+            id: "expectedId",
+            label: "expected",
+            data: diceOutcomes.map(
+              (outcome) =>
+                Math.round(
+                  (probabilities[outcome] * props.state.rolls.length * 10) / 36
+                ) / 10
+            ),
+          },
+          {
+            id: "actualId",
+            label: "actual",
+            data: diceOutcomes.map(
+              (outcome) =>
+                props.state.rolls.filter((roll) => roll === outcome).length
+            ),
+          },
+        ]}
+      ></BarChart>
+      <h3>Rohstoffe</h3>
+      <BarChart
+        barLabel={"value"}
+        height={300}
+        xAxis={[{ data: props.state.players }]}
+        series={[
+          {
+            id: "expectedtId",
+            label: "expected",
+            data: props.state.players.map(
+              (player) =>
+                Math.round(
+                  10 *
+                    props.state.settlements
+                      .filter((settlement) => settlement.player === player)
+                      .map((settlement) =>
+                        settlement.income
+                          .map(
+                            (income) =>
+                              ((props.state.rolls.length -
+                                settlement.turn -
+                                1) *
+                                probabilities[income.number]) /
+                              36
+                          )
+                          .reduce((partialSum, a) => partialSum + a, 0)
+                      )
+                      .reduce((partialSum, a) => partialSum + a, 0)
+                ) / 10
+            ),
+          },
+          {
+            id: "actualtId",
+            label: "actual",
+            data: props.state.players.map((player) =>
+              props.state.settlements
+                .filter((settlement) => settlement.player === player)
+                .map((settlement) =>
+                  props.state.rolls
+                    .slice(settlement.turn < 0 ? undefined : settlement.turn)
+                    .map(
+                      (roll) =>
+                        settlement.income.filter(
+                          (income) => income.number === roll
+                        ).length
+                    )
+                    .reduce((partialSum, a) => partialSum + a, 0)
+                )
+                .reduce((partialSum, a) => partialSum + a, 0)
+            ),
+          },
+        ]}
+      ></BarChart>
+      <Divider></Divider>
       <Button onClick={() => downloadState()}>Exportieren</Button>
       <Button onClick={() => setOpenDialog(true)}>Neue Session</Button>
       <Dialog open={openDialog} onClose={closeDialog}>
