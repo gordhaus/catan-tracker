@@ -1,5 +1,6 @@
 "use client";
 import {
+  AppBar,
   Box,
   Button,
   Dialog,
@@ -13,6 +14,8 @@ import {
   InputLabel,
   MenuItem,
   Select,
+  Tab,
+  Tabs,
   TextField,
 } from "@mui/material";
 import React, { useState } from "react";
@@ -83,6 +86,8 @@ export interface State {
   settlements: Settlement[];
   rolls: DiceOutcome[];
 }
+
+type Tab = "DICE" | "SETTLEMENTS" | "STATS";
 
 export default function Home() {
   const [state, setState] = React.useState<State>(getState());
@@ -388,277 +393,305 @@ function IngameInterface(props: {
     props.state.players[props.state.rolls.length % props.state.players.length];
 
   const [openDialog, setOpenDialog] = useState(false);
+  const [tab, setTab] = useState<Tab>("DICE");
 
   function closeDialog() {
     setOpenDialog(false);
   }
+
+  const handleChange = (_event: React.SyntheticEvent, newValue: Tab) => {
+    setTab(newValue);
+  };
   return (
     <>
       {currentTurn && <h1>{`Am Zug: ${currentTurn}`}</h1>}
       <h2>{`Nächster Zug: ${nextTurn}`}</h2>
-      <Grid container spacing={2}>
-        {diceOutcomes.map((outcome) => (
-          <Grid key={outcome} size={4}>
-            <Button
-              variant="contained"
-              onClick={() =>
-                updateState(
-                  (state) => ({
-                    ...state,
-                    rolls: state.rolls.concat([outcome]),
-                  }),
-                  props.setState
-                )
-              }
-            >
-              {outcome}
-            </Button>
-          </Grid>
-        ))}
-        <Grid size={4}>
-          <Button
-            variant="contained"
-            onClick={() =>
-              updateState(
-                (state) => ({
-                  ...state,
-                  rolls: state.rolls.toSpliced(state.rolls.length - 1, 1),
-                }),
-                props.setState
-              )
-            }
-          >
-            Undo
-          </Button>
-        </Grid>
-      </Grid>
-      <Divider />
-      <CreateSettlement
-        key={props.state.rolls.length}
-        state={props.state}
-        setState={props.setState}
-        turn={props.state.rolls.length - 1}
-        playerOnTurn={currentTurn}
-      />
-      <Divider />
-      <Grid container spacing={2}>
-        {props.state.players.map((player) => (
-          <Grid
-            key={`score-sheet-heading-${player}`}
-            size={12 / props.state.players.length}
-          >
-            <h3>{player}</h3>
-          </Grid>
-        ))}
-        {props.state.rolls.map((roll, index) => (
-          <Grid key={`roll-${index}`} size={12 / props.state.players.length}>
-            {roll}
-          </Grid>
-        ))}
-      </Grid>
-      <Divider />
-      <h2>Siedlungen</h2>
-      {props.state.players.map((player) => (
-        <div key={player}>
-          <h2>{player}</h2>
-          {props.state.settlements
-            .filter((settlement) => settlement.player === player)
-            .map((settlement) => (
-              <div key={`settlement-${settlement.id}`}>
-                <Box display={"flex"} flexDirection={"row"} gap={1}>
-                  {settlement.income.map((income, index) => (
-                    <div key={`settlemend-${settlement.id}-${index}`}>{`${
-                      income.number
-                    } ${resourceAbbrev[income.resource]}`}</div>
-                  ))}
-                </Box>
-                <Box display={"flex"} flexDirection={"row"} gap={2}>
-                  <div>{`Zug: ${settlement.turn}`}</div>
-                  <Button
-                    onClick={() =>
-                      updateState((state) => {
-                        const index = state.settlements.findIndex(
-                          (element) => element.id === settlement.id
-                        );
-                        return {
-                          ...state,
-                          settlements: state.settlements.toSpliced(index, 1),
-                        };
-                      }, props.setState)
-                    }
-                  >
-                    Löschen
-                  </Button>
-                </Box>
-              </div>
+      <Tabs value={tab} onChange={handleChange} variant="fullWidth">
+        <Tab label="Würfel" value="DICE" />
+        <Tab label="Siedlungen" value="SETTLEMENTS" />
+        <Tab label="Stats" value="STATS" />
+      </Tabs>
+      {tab === "DICE" && (
+        <>
+          <Grid container spacing={2}>
+            {diceOutcomes.map((outcome) => (
+              <Grid key={outcome} size={4}>
+                <Button
+                  variant="contained"
+                  onClick={() =>
+                    updateState(
+                      (state) => ({
+                        ...state,
+                        rolls: state.rolls.concat([outcome]),
+                      }),
+                      props.setState
+                    )
+                  }
+                >
+                  {outcome}
+                </Button>
+              </Grid>
             ))}
-        </div>
-      ))}
-      <Divider />
-      <h2>Statistiken</h2>
-      <h3>Würfel</h3>
-      <BarChart
-        barLabel={"value"}
-        layout="horizontal"
-        height={500}
-        yAxis={[{ data: diceOutcomes }]}
-        series={[
-          {
-            id: "expectedId",
-            label: "expected",
-            data: diceOutcomes.map(
-              (outcome) =>
-                Math.round(
-                  (probabilities[outcome] * props.state.rolls.length * 10) / 36
-                ) / 10
-            ),
-          },
-          {
-            id: "actualId",
-            label: "actual",
-            data: diceOutcomes.map(
-              (outcome) =>
-                props.state.rolls.filter((roll) => roll === outcome).length
-            ),
-          },
-        ]}
-      ></BarChart>
-      <h3>Rohstoffe</h3>
-      <BarChart
-        barLabel={"value"}
-        height={300}
-        xAxis={[{ data: props.state.players }]}
-        series={[
-          {
-            id: "expectedtId",
-            label: "expected",
-            data: props.state.players.map(
-              (player) =>
-                Math.round(
-                  10 *
-                    props.state.settlements
-                      .filter((settlement) => settlement.player === player)
-                      .map((settlement) =>
-                        settlement.income
-                          .map(
-                            (income) =>
-                              ((props.state.rolls.length -
-                                settlement.turn -
-                                1) *
-                                probabilities[income.number]) /
-                              36
+            <Grid size={4}>
+              <Button
+                variant="contained"
+                onClick={() =>
+                  updateState(
+                    (state) => ({
+                      ...state,
+                      rolls: state.rolls.toSpliced(state.rolls.length - 1, 1),
+                    }),
+                    props.setState
+                  )
+                }
+              >
+                Undo
+              </Button>
+            </Grid>
+          </Grid>
+          <Divider />
+          <Grid container spacing={2}>
+            {props.state.players.map((player) => (
+              <Grid
+                key={`score-sheet-heading-${player}`}
+                size={12 / props.state.players.length}
+              >
+                <h3>{player}</h3>
+              </Grid>
+            ))}
+            {props.state.rolls.map((roll, index) => (
+              <Grid
+                key={`roll-${index}`}
+                size={12 / props.state.players.length}
+              >
+                {roll}
+              </Grid>
+            ))}
+          </Grid>
+        </>
+      )}
+      {tab === "SETTLEMENTS" && (
+        <>
+          <CreateSettlement
+            key={props.state.rolls.length}
+            state={props.state}
+            setState={props.setState}
+            turn={props.state.rolls.length - 1}
+            playerOnTurn={currentTurn}
+          />
+          <Divider />
+          <h2>Siedlungen</h2>
+          {props.state.players.map((player) => (
+            <div key={player}>
+              <h2>{player}</h2>
+              {props.state.settlements
+                .filter((settlement) => settlement.player === player)
+                .map((settlement) => (
+                  <div key={`settlement-${settlement.id}`}>
+                    <Box display={"flex"} flexDirection={"row"} gap={1}>
+                      {settlement.income.map((income, index) => (
+                        <div key={`settlemend-${settlement.id}-${index}`}>{`${
+                          income.number
+                        } ${resourceAbbrev[income.resource]}`}</div>
+                      ))}
+                    </Box>
+                    <Box display={"flex"} flexDirection={"row"} gap={2}>
+                      <div>{`Zug: ${settlement.turn}`}</div>
+                      <Button
+                        onClick={() =>
+                          updateState((state) => {
+                            const index = state.settlements.findIndex(
+                              (element) => element.id === settlement.id
+                            );
+                            return {
+                              ...state,
+                              settlements: state.settlements.toSpliced(
+                                index,
+                                1
+                              ),
+                            };
+                          }, props.setState)
+                        }
+                      >
+                        Löschen
+                      </Button>
+                    </Box>
+                  </div>
+                ))}
+            </div>
+          ))}
+        </>
+      )}
+      {tab === "STATS" && (
+        <>
+          <h3>Würfel</h3>
+          <BarChart
+            barLabel={"value"}
+            layout="horizontal"
+            height={500}
+            yAxis={[{ data: diceOutcomes }]}
+            series={[
+              {
+                id: "expectedId",
+                label: "expected",
+                data: diceOutcomes.map(
+                  (outcome) =>
+                    Math.round(
+                      (probabilities[outcome] * props.state.rolls.length * 10) /
+                        36
+                    ) / 10
+                ),
+              },
+              {
+                id: "actualId",
+                label: "actual",
+                data: diceOutcomes.map(
+                  (outcome) =>
+                    props.state.rolls.filter((roll) => roll === outcome).length
+                ),
+              },
+            ]}
+          ></BarChart>
+          <h3>Rohstoffe</h3>
+          <BarChart
+            barLabel={"value"}
+            height={300}
+            xAxis={[{ data: props.state.players }]}
+            series={[
+              {
+                id: "expectedtId",
+                label: "expected",
+                data: props.state.players.map(
+                  (player) =>
+                    Math.round(
+                      10 *
+                        props.state.settlements
+                          .filter((settlement) => settlement.player === player)
+                          .map((settlement) =>
+                            settlement.income
+                              .map(
+                                (income) =>
+                                  ((props.state.rolls.length -
+                                    settlement.turn -
+                                    1) *
+                                    probabilities[income.number]) /
+                                  36
+                              )
+                              .reduce((partialSum, a) => partialSum + a, 0)
                           )
                           .reduce((partialSum, a) => partialSum + a, 0)
-                      )
-                      .reduce((partialSum, a) => partialSum + a, 0)
-                ) / 10
-            ),
-          },
-          {
-            id: "actualtId",
-            label: "actual",
-            data: props.state.players.map((player) =>
-              props.state.settlements
-                .filter((settlement) => settlement.player === player)
-                .map((settlement) =>
-                  props.state.rolls
-                    .slice(settlement.turn < 0 ? undefined : settlement.turn)
-                    .map(
-                      (roll) =>
-                        settlement.income.filter(
-                          (income) => income.number === roll
-                        ).length
+                    ) / 10
+                ),
+              },
+              {
+                id: "actualtId",
+                label: "actual",
+                data: props.state.players.map((player) =>
+                  props.state.settlements
+                    .filter((settlement) => settlement.player === player)
+                    .map((settlement) =>
+                      props.state.rolls
+                        .slice(
+                          settlement.turn < 0 ? undefined : settlement.turn
+                        )
+                        .map(
+                          (roll) =>
+                            settlement.income.filter(
+                              (income) => income.number === roll
+                            ).length
+                        )
+                        .reduce((partialSum, a) => partialSum + a, 0)
                     )
                     .reduce((partialSum, a) => partialSum + a, 0)
-                )
-                .reduce((partialSum, a) => partialSum + a, 0)
-            ),
-          },
-        ]}
-      ></BarChart>
-      <Divider></Divider>
-      <h3>Würfel erste 18 Züge</h3>
-      <BarChart
-        barLabel={"value"}
-        layout="horizontal"
-        height={500}
-        yAxis={[{ data: diceOutcomes }]}
-        series={[
-          {
-            id: "expectedId",
-            label: "expected",
-            data: diceOutcomes.map(
-              (outcome) =>
-                Math.round((probabilities[outcome] * 18 * 10) / 36) / 10
-            ),
-          },
-          {
-            id: "actualId",
-            label: "actual",
-            data: diceOutcomes.map(
-              (outcome) =>
-                props.state.rolls
-                  .slice(undefined, 18)
-                  .filter((roll) => roll === outcome).length
-            ),
-          },
-        ]}
-      ></BarChart>
-      <h3>Rohstoffe erste 18 Züge</h3>
-      <BarChart
-        barLabel={"value"}
-        height={300}
-        xAxis={[{ data: props.state.players }]}
-        series={[
-          {
-            id: "startExpectedId",
-            label: "expected",
-            data: props.state.players.map(
-              (player) =>
-                Math.round(
-                  10 *
-                    props.state.settlements
-                      .filter((settlement) => settlement.player === player)
-                      .filter((settlement) => settlement.turn < 17)
-                      .map((settlement) =>
-                        settlement.income
-                          .map(
-                            (income) =>
-                              ((18 - settlement.turn - 1) *
-                                probabilities[income.number]) /
-                              36
+                ),
+              },
+            ]}
+          ></BarChart>
+          <Divider></Divider>
+          <h3>Würfel erste 18 Züge</h3>
+          <BarChart
+            barLabel={"value"}
+            layout="horizontal"
+            height={500}
+            yAxis={[{ data: diceOutcomes }]}
+            series={[
+              {
+                id: "expectedId",
+                label: "expected",
+                data: diceOutcomes.map(
+                  (outcome) =>
+                    Math.round((probabilities[outcome] * 18 * 10) / 36) / 10
+                ),
+              },
+              {
+                id: "actualId",
+                label: "actual",
+                data: diceOutcomes.map(
+                  (outcome) =>
+                    props.state.rolls
+                      .slice(undefined, 18)
+                      .filter((roll) => roll === outcome).length
+                ),
+              },
+            ]}
+          ></BarChart>
+          <h3>Rohstoffe erste 18 Züge</h3>
+          <BarChart
+            barLabel={"value"}
+            height={300}
+            xAxis={[{ data: props.state.players }]}
+            series={[
+              {
+                id: "startExpectedId",
+                label: "expected",
+                data: props.state.players.map(
+                  (player) =>
+                    Math.round(
+                      10 *
+                        props.state.settlements
+                          .filter((settlement) => settlement.player === player)
+                          .filter((settlement) => settlement.turn < 17)
+                          .map((settlement) =>
+                            settlement.income
+                              .map(
+                                (income) =>
+                                  ((18 - settlement.turn - 1) *
+                                    probabilities[income.number]) /
+                                  36
+                              )
+                              .reduce((partialSum, a) => partialSum + a, 0)
                           )
                           .reduce((partialSum, a) => partialSum + a, 0)
-                      )
-                      .reduce((partialSum, a) => partialSum + a, 0)
-                ) / 10
-            ),
-          },
-          {
-            id: "startActualId",
-            label: "actual",
-            data: props.state.players.map((player) =>
-              props.state.settlements
-                .filter((settlement) => settlement.player === player)
-                .map((settlement) =>
-                  props.state.rolls
-                    .slice(
-                      settlement.turn < 0 ? undefined : settlement.turn,
-                      18
-                    )
-                    .map(
-                      (roll) =>
-                        settlement.income.filter(
-                          (income) => income.number === roll
-                        ).length
+                    ) / 10
+                ),
+              },
+              {
+                id: "startActualId",
+                label: "actual",
+                data: props.state.players.map((player) =>
+                  props.state.settlements
+                    .filter((settlement) => settlement.player === player)
+                    .map((settlement) =>
+                      props.state.rolls
+                        .slice(
+                          settlement.turn < 0 ? undefined : settlement.turn,
+                          18
+                        )
+                        .map(
+                          (roll) =>
+                            settlement.income.filter(
+                              (income) => income.number === roll
+                            ).length
+                        )
+                        .reduce((partialSum, a) => partialSum + a, 0)
                     )
                     .reduce((partialSum, a) => partialSum + a, 0)
-                )
-                .reduce((partialSum, a) => partialSum + a, 0)
-            ),
-          },
-        ]}
-      ></BarChart>
+                ),
+              },
+            ]}
+          ></BarChart>
+        </>
+      )}
       <Divider></Divider>
       <Button onClick={() => downloadState()}>Exportieren</Button>
       <Button onClick={() => setOpenDialog(true)}>Neue Session</Button>
