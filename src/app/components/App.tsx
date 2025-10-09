@@ -577,6 +577,89 @@ function IngameInterface(props: {
         ]}
       ></BarChart>
       <Divider></Divider>
+      <h3>Würfel erste 18 Züge</h3>
+      <BarChart
+        barLabel={"value"}
+        layout="horizontal"
+        height={500}
+        yAxis={[{ data: diceOutcomes }]}
+        series={[
+          {
+            id: "expectedId",
+            label: "expected",
+            data: diceOutcomes.map(
+              (outcome) =>
+                Math.round((probabilities[outcome] * 18 * 10) / 36) / 10
+            ),
+          },
+          {
+            id: "actualId",
+            label: "actual",
+            data: diceOutcomes.map(
+              (outcome) =>
+                props.state.rolls
+                  .slice(undefined, 18)
+                  .filter((roll) => roll === outcome).length
+            ),
+          },
+        ]}
+      ></BarChart>
+      <h3>Rohstoffe erste 18 Züge</h3>
+      <BarChart
+        barLabel={"value"}
+        height={300}
+        xAxis={[{ data: props.state.players }]}
+        series={[
+          {
+            id: "startExpectedId",
+            label: "expected",
+            data: props.state.players.map(
+              (player) =>
+                Math.round(
+                  10 *
+                    props.state.settlements
+                      .filter((settlement) => settlement.player === player)
+                      .filter((settlement) => settlement.turn < 17)
+                      .map((settlement) =>
+                        settlement.income
+                          .map(
+                            (income) =>
+                              ((18 - settlement.turn - 1) *
+                                probabilities[income.number]) /
+                              36
+                          )
+                          .reduce((partialSum, a) => partialSum + a, 0)
+                      )
+                      .reduce((partialSum, a) => partialSum + a, 0)
+                ) / 10
+            ),
+          },
+          {
+            id: "startActualId",
+            label: "actual",
+            data: props.state.players.map((player) =>
+              props.state.settlements
+                .filter((settlement) => settlement.player === player)
+                .map((settlement) =>
+                  props.state.rolls
+                    .slice(
+                      settlement.turn < 0 ? undefined : settlement.turn,
+                      18
+                    )
+                    .map(
+                      (roll) =>
+                        settlement.income.filter(
+                          (income) => income.number === roll
+                        ).length
+                    )
+                    .reduce((partialSum, a) => partialSum + a, 0)
+                )
+                .reduce((partialSum, a) => partialSum + a, 0)
+            ),
+          },
+        ]}
+      ></BarChart>
+      <Divider></Divider>
       <Button onClick={() => downloadState()}>Exportieren</Button>
       <Button onClick={() => setOpenDialog(true)}>Neue Session</Button>
       <Dialog open={openDialog} onClose={closeDialog}>
