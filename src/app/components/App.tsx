@@ -490,7 +490,7 @@ function IngameInterface(props: {
                   <div key={`settlement-${settlement.id}`}>
                     <Box display={"flex"} flexDirection={"row"} gap={1}>
                       {settlement.income.map((income, index) => (
-                        <div key={`settlemend-${settlement.id}-${index}`}>{`${
+                        <div key={`settlement-${settlement.id}-${index}`}>{`${
                           income.number
                         } ${resourceAbbrev[income.resource]}`}</div>
                       ))}
@@ -514,6 +514,30 @@ function IngameInterface(props: {
                         }
                       >
                         Löschen
+                      </Button>
+                      <Button
+                        onClick={() =>
+                          updateState((state) => {
+                            return {
+                              ...state,
+                              settlements: [
+                                ...state.settlements,
+                                {
+                                  ...settlement,
+                                  turn: props.state.rolls.length - 1,
+                                  id:
+                                    Math.max(
+                                      ...state.settlements.map(
+                                        (settlement) => settlement.id
+                                      )
+                                    ) + 1,
+                                },
+                              ],
+                            };
+                          }, props.setState)
+                        }
+                      >
+                        Stadt
                       </Button>
                     </Box>
                   </div>
