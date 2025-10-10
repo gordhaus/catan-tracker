@@ -1,0 +1,121 @@
+name: Lint and Format Check
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  checks: write
+
+jobs:
+  lint-and-format:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        name: Install Bun
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install
+
+      - name: Run ESLint
+        id: eslint
+        run: |
+          # Run ESLint with JSON formatter for annotations
+          bun run lint --format json --output-file eslint-results.json || true
+
+          # Also run with default formatter for summary
+          echo "## ESLint Results" >> $GITHUB_STEP_SUMMARY
+          if bun run lint; then
+            echo "✅ No linting errors found" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "❌ Linting errors found - see annotations in the Files Changed tab" >> $GITHUB_STEP_SUMMARY
+          fi
+        continue-on-error: true
+
+      - name: Annotate ESLint Results
+        if: always()
+        uses: ataylorme/eslint-annotate-action@v3
+        with:
+          report-json: "eslint-results.json"
+          check-name: "ESLint Results"
+          fail-on-error: true
+          fail-on-warning: false
+
+      - name: Run Prettier format check
+        id: prettier
+        run: |
+          echo "## Prettier Format Check" >> $GITHUB_STEP_SUMMARY
+
+          # Run prettier check and capture output
+          if bun run format:check 2>&1 | tee prettier-output.txt; then
+            echo "✅ All files are properly formatted" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "❌ Some files are not properly formatted" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            
+            # Parse prettier output and create annotations
+            grep -E "\.tsx?$|\.jsx?$|\.json$|\.css$|\.html$" prettier-output.txt | while read -r file; do
+              # Create annotation for each file
+              echo "::warning file=${file},title=Prettier Format Issue::File needs formatting. Run 'bun format' to fix."
+            done
+            
+            # Also add to summary
+            echo "Files that need formatting:" >> $GITHUB_STEP_SUMMARY
+            echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+            grep -E "\.tsx?$|\.jsx?$|\.json$|\.css$|\.html$" prettier-output.txt | head -20 >> $GITHUB_STEP_SUMMARY || true
+            echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "Run \`bun format\` to fix formatting issues" >> $GITHUB_STEP_SUMMARY
+            exit 1
+          fi
+
+      - name: Build check
+        id: build
+        run: |
+          echo "## Build Check" >> $GITHUB_STEP_SUMMARY
+
+          if bun run build 2>&1 | tee build-output.txt; then
+            echo "✅ Build successful" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "❌ Build failed" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            
+            # Parse build errors and create annotations
+            # TypeScript/Next.js errors typically have format: path/to/file.ts(line,col): error message
+            grep -E "Error:|error TS[0-9]+:" build-output.txt | while IFS= read -r line; do
+              # Try to extract file, line, and message
+              if [[ $line =~ ([^[:space:]]+)\(([0-9]+),([0-9]+)\): ]]; then
+                file="${BASH_REMATCH[1]}"
+                linenum="${BASH_REMATCH[2]}"
+                message="${line#*: }"
+                echo "::error file=${file},line=${linenum},title=Build Error::${message}"
+              elif [[ $line =~ ^[[:space:]]*(.+):([0-9]+):([0-9]+)[[:space:]]-[[:space:]]error[[:space:]](.+)$ ]]; then
+                # ESLint-style format in build output
+                file="${BASH_REMATCH[1]}"
+                linenum="${BASH_REMATCH[2]}"
+                message="${BASH_REMATCH[4]}"
+                echo "::error file=${file},line=${linenum},title=Build Error::${message}"
+              else
+                # Generic error without file location
+                echo "::error title=Build Error::${line}"
+              fi
+            done
+            
+            # Add summary
+            echo "Build errors (last 100 lines):" >> $GITHUB_STEP_SUMMARY
+            echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+            tail -100 build-output.txt >> $GITHUB_STEP_SUMMARY
+            echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+            exit 1
+          fi
