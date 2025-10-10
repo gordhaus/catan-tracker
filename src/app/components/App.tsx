@@ -1,6 +1,5 @@
 "use client";
 import {
-  AppBar,
   Box,
   Button,
   Dialog,
@@ -28,10 +27,14 @@ import {
 } from "../localStorage";
 import styles from "../page.module.css";
 import { BarChart } from "@mui/x-charts";
+import {
+  ResourceNumberSelector,
+  type DiceOutcome,
+  type Resource,
+  type OptionalFieldValue,
+} from "./ResourceNumberSelector";
 
 const diceOutcomes = [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12] as const;
-type DiceOutcome = (typeof diceOutcomes)[number];
-
 const probabilities: Record<DiceOutcome, number> = {
   2: 1,
   3: 2,
@@ -46,22 +49,10 @@ const probabilities: Record<DiceOutcome, number> = {
   12: 1,
 };
 
-const resources = ["WHEAT", "ORE", "WOOD", "CLAY", "WOOL", "GOLD"] as const;
-type Resource = (typeof resources)[number];
-
 interface Income {
   resource: Resource;
   number: DiceOutcome;
 }
-
-const resourceNames: Record<Resource, string> = {
-  WHEAT: "Getreide",
-  ORE: "Erz",
-  WOOD: "Holz",
-  CLAY: "Lehm",
-  WOOL: "Wolle",
-  GOLD: "Gold",
-};
 
 const resourceAbbrev: Record<Resource, string> = {
   WHEAT: "GE",
@@ -78,8 +69,6 @@ interface Settlement {
   turn: number;
   id: number;
 }
-
-type OptionalFieldValue<T> = T | "";
 
 export interface State {
   players: string[];
@@ -203,114 +192,27 @@ function CreateSettlement(props: CreateSettlementProps) {
           ))}
         </Select>
       </FormControl>
-      <Box display={"flex"} gap={2} flexDirection={"row"}>
-        <FormControl>
-          <InputLabel id="create-starting-settlement-resource-1">
-            Rohstoff 1
-          </InputLabel>
-          <Select
-            value={resource1}
-            label="Rohstoff 1"
-            onChange={(event) => setResource1(event.target.value)}
-            sx={{ width: "150px" }}
-          >
-            {resources.map((resource) => (
-              <MenuItem key={`resource-1-${resource}`} value={resource}>
-                {resourceNames[resource]}
-              </MenuItem>
-            ))}
-          </Select>
-        </FormControl>
-        <FormControl>
-          <InputLabel id="create-starting-settlement-number-1">
-            Zahlenchip 1
-          </InputLabel>
-          <Select
-            value={number1}
-            label="Zahlenchip 1"
-            onChange={(event) => setNumber1(event.target.value)}
-            sx={{ width: "150px" }}
-          >
-            {diceOutcomes.map((number) => (
-              <MenuItem key={`chip-1-${number}`} value={number}>
-                {number}
-              </MenuItem>
-            ))}
-          </Select>
-        </FormControl>
-      </Box>
-      <Box display={"flex"} gap={2} flexDirection={"row"}>
-        <FormControl>
-          <InputLabel id="create-starting-settlement-resource-2">
-            Rohstoff 2
-          </InputLabel>
-          <Select
-            value={resource2}
-            label="Rohstoff 2"
-            onChange={(event) => setResource2(event.target.value)}
-            sx={{ width: "150px" }}
-          >
-            {resources.map((resource) => (
-              <MenuItem key={`resource-2-${resource}`} value={resource}>
-                {resourceNames[resource]}
-              </MenuItem>
-            ))}
-          </Select>
-        </FormControl>
-        <FormControl>
-          <InputLabel id="create-starting-settlement-number-2">
-            Zahlenchip 2
-          </InputLabel>
-          <Select
-            value={number2}
-            label="Zahlenchip 2"
-            onChange={(event) => setNumber2(event.target.value)}
-            sx={{ width: "150px" }}
-          >
-            {diceOutcomes.map((number) => (
-              <MenuItem key={`chip-2-${number}`} value={number}>
-                {number}
-              </MenuItem>
-            ))}
-          </Select>
-        </FormControl>
-      </Box>
-      <Box display={"flex"} gap={2} flexDirection={"row"}>
-        <FormControl>
-          <InputLabel id="create-starting-settlement-resource-3">
-            Rohstoff 3
-          </InputLabel>
-          <Select
-            value={resource3}
-            label="Rohstoff 3"
-            onChange={(event) => setResource3(event.target.value)}
-            sx={{ width: "150px" }}
-          >
-            {resources.map((resource) => (
-              <MenuItem key={`resource-3-${resource}`} value={resource}>
-                {resourceNames[resource]}
-              </MenuItem>
-            ))}
-          </Select>
-        </FormControl>
-        <FormControl>
-          <InputLabel id="create-starting-settlement-number-3">
-            Zahlenchip 3
-          </InputLabel>
-          <Select
-            value={number3}
-            label="Zahlenchip 3"
-            onChange={(event) => setNumber3(event.target.value)}
-            sx={{ width: "150px" }}
-          >
-            {diceOutcomes.map((number) => (
-              <MenuItem key={`chip-3-${number}`} value={number}>
-                {number}
-              </MenuItem>
-            ))}
-          </Select>
-        </FormControl>
-      </Box>
+      <ResourceNumberSelector
+        index={1}
+        resource={resource1}
+        number={number1}
+        onResourceChange={setResource1}
+        onNumberChange={setNumber1}
+      />
+      <ResourceNumberSelector
+        index={2}
+        resource={resource2}
+        number={number2}
+        onResourceChange={setResource2}
+        onNumberChange={setNumber2}
+      />
+      <ResourceNumberSelector
+        index={3}
+        resource={resource3}
+        number={number3}
+        onResourceChange={setResource3}
+        onNumberChange={setNumber3}
+      />
       <TextField
         label="Zug"
         value={turn}
