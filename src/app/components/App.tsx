@@ -20,7 +20,6 @@ import {
   deleteSession,
   downloadState,
   getState,
-  importState,
   updateState,
 } from "../localStorage";
 import styles from "../page.module.css";
@@ -34,6 +33,7 @@ import { DiceTab } from "./DiceTab";
 import { SettlementsTab } from "./SettlementsTab";
 import { StatsTab } from "./StatsTab";
 import { TabHeader } from "./TabHeader";
+import { PlayerSetup } from "./PlayerSetup";
 
 interface Income {
   resource: Resource;
@@ -57,69 +57,11 @@ type Tab = "DICE" | "SETTLEMENTS" | "STATS";
 
 export default function Home() {
   const [state, setState] = React.useState<State>(getState());
-  const [player1, updatePlayer1] = React.useState("");
-  const [player2, updatePlayer2] = React.useState("");
-  const [player3, updatePlayer3] = React.useState("");
-  const [player4, updatePlayer4] = React.useState("");
 
   return (
     <div className={styles.page}>
       {!state.players.length ? (
-        <>
-          <TextField
-            label="Spieler 1"
-            value={player1}
-            onChange={(event: React.ChangeEvent<HTMLInputElement>) => {
-              updatePlayer1(event.target.value);
-            }}
-          ></TextField>
-          <TextField
-            label="Spieler 2"
-            value={player2}
-            onChange={(event: React.ChangeEvent<HTMLInputElement>) => {
-              updatePlayer2(event.target.value);
-            }}
-          ></TextField>
-          <TextField
-            label="Spieler 3"
-            value={player3}
-            onChange={(event: React.ChangeEvent<HTMLInputElement>) => {
-              updatePlayer3(event.target.value);
-            }}
-          ></TextField>
-          <TextField
-            label="Spieler 4"
-            value={player4}
-            onChange={(event: React.ChangeEvent<HTMLInputElement>) => {
-              updatePlayer4(event.target.value);
-            }}
-          ></TextField>
-          <Button
-            onClick={() =>
-              updateState(
-                (state) => ({
-                  ...state,
-                  players: [player1, player2, player3, player4].filter(
-                    (player) => player != ""
-                  ),
-                }),
-                setState
-              )
-            }
-          >
-            Speichern
-          </Button>
-          <Button component="label" role={undefined} variant="contained">
-            Importieren
-            <input
-              type="file"
-              onChange={async (event) => {
-                importState((await event.target.files?.item(0)?.text()) ?? "");
-              }}
-              accept="application/json"
-            />
-          </Button>
-        </>
+        <PlayerSetup setState={setState} />
       ) : (
         <IngameInterface state={state} setState={setState} />
       )}
