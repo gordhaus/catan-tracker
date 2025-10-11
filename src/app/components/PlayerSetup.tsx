@@ -1,6 +1,6 @@
 import { Button, TextField } from "@mui/material";
 import React from "react";
-import { importState, updateState } from "../localStorage";
+import { importState } from "../localStorage";
 import type { State } from "./App";
 
 interface PlayerSetupProps {
@@ -26,13 +26,10 @@ export function PlayerSetup(props: PlayerSetupProps) {
       ))}
       <Button
         onClick={() =>
-          updateState(
-            (state) => ({
-              ...state,
-              players: players.filter((player) => player !== ""),
-            }),
-            props.setState
-          )
+          props.setState((state) => ({
+            ...state,
+            players: players.filter((player) => player !== ""),
+          }))
         }
       >
         Speichern

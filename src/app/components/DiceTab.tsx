@@ -1,5 +1,4 @@
 import { Button, Divider, Grid } from "@mui/material";
-import { updateState } from "../localStorage";
 import type { State } from "./App";
 import { DICE_OUTCOMES } from "../lib/diceConstants";
 
@@ -17,13 +16,10 @@ export function DiceTab(props: DiceTabProps) {
             <Button
               variant="contained"
               onClick={() =>
-                updateState(
-                  (state) => ({
-                    ...state,
-                    rolls: state.rolls.concat([outcome]),
-                  }),
-                  props.setState
-                )
+                props.setState((state) => ({
+                  ...state,
+                  rolls: state.rolls.concat([outcome]),
+                }))
               }
             >
               {outcome}
@@ -34,13 +30,10 @@ export function DiceTab(props: DiceTabProps) {
           <Button
             variant="contained"
             onClick={() =>
-              updateState(
-                (state) => ({
-                  ...state,
-                  rolls: state.rolls.slice(0, -1),
-                }),
-                props.setState
-              )
+              props.setState((state) => ({
+                ...state,
+                rolls: state.rolls.slice(0, -1),
+              }))
             }
           >
             Undo

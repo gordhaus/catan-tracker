@@ -20,7 +20,7 @@ import {
   deleteSession,
   downloadState,
   getState,
-  updateState,
+  saveState,
 } from "../localStorage";
 import styles from "../page.module.css";
 import {
@@ -57,6 +57,11 @@ type Tab = "DICE" | "SETTLEMENTS" | "STATS";
 
 export default function Home() {
   const [state, setState] = React.useState<State>(getState());
+
+  // Automatically sync state to localStorage whenever it changes
+  React.useEffect(() => {
+    saveState(state);
+  }, [state]);
 
   return (
     <div className={styles.page}>
@@ -152,27 +157,22 @@ function CreateSettlement(props: CreateSettlementProps) {
       <Button
         onClick={() => {
           if (player === "") return;
-          updateState(
-            (state) => ({
-              ...state,
-              settlements: state.settlements.concat([
-                {
-                  id:
-                    state.settlements.length === 0
-                      ? 0
-                      : Math.max(
-                        ...state.settlements.map(
-                          (settlement) => settlement.id
-                        )
+          props.setState((state) => ({
+            ...state,
+            settlements: state.settlements.concat([
+              {
+                id:
+                  state.settlements.length === 0
+                    ? 0
+                    : Math.max(
+                        ...state.settlements.map((settlement) => settlement.id)
                       ) + 1,
-                  turn,
-                  player,
-                  income: removeEmptyIncomes(incomes),
-                },
-              ]),
-            }),
-            props.setState
-          );
+                turn,
+                player,
+                income: removeEmptyIncomes(incomes),
+              },
+            ]),
+          }));
           resetForm();
         }}
       >
@@ -210,8 +210,8 @@ function IngameInterface(props: {
     props.state.rolls.length === 0
       ? undefined
       : props.state.players[
-      (props.state.rolls.length - 1) % props.state.players.length
-      ];
+          (props.state.rolls.length - 1) % props.state.players.length
+        ];
   const nextTurn =
     props.state.players[props.state.rolls.length % props.state.players.length];
 

@@ -1,10 +1,7 @@
 import { Divider } from "@mui/material";
 import { BarChart } from "@mui/x-charts";
 import type { State } from "./App";
-import {
-  DICE_OUTCOMES,
-  DICE_OUTCOME_COUNTS,
-} from "../lib/diceConstants";
+import { DICE_OUTCOMES, DICE_OUTCOME_COUNTS } from "../lib/diceConstants";
 
 interface StatsTabProps {
   state: State;
@@ -27,7 +24,10 @@ export function StatsTab(props: StatsTabProps) {
             data: DICE_OUTCOMES.map(
               (outcome) =>
                 Math.round(
-                  (DICE_OUTCOME_COUNTS[outcome] * props.state.rolls.length * 10) / 36
+                  (DICE_OUTCOME_COUNTS[outcome] *
+                    props.state.rolls.length *
+                    10) /
+                    36
                 ) / 10
             ),
           },
