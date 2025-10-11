@@ -48,7 +48,7 @@ export function SettlementsTab(props: SettlementsTabProps) {
                         );
                         return {
                           ...state,
-                          settlements: state.settlements.toSpliced(index, 1),
+                          settlements: [...state.settlements.slice(0, index), ...state.settlements.slice(index + 1)],
                         };
                       }, props.setState)
                     }

@@ -52,6 +52,39 @@ jobs:
           fail-on-error: true
           fail-on-warning: false
 
+      - name: Run TypeScript check
+        id: tsc
+        run: |
+          echo "## TypeScript Check" >> $GITHUB_STEP_SUMMARY
+
+          # Run TypeScript compiler check and capture output
+          if bun tsc --noEmit 2>&1 | tee tsc-output.txt; then
+            echo "✅ No TypeScript errors found" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "❌ TypeScript errors found" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            
+            # Parse TypeScript errors and create annotations
+            # Format: src/path/file.tsx(19,7): error TS2322: Type 'string' is not assignable to type 'number'.
+            grep -E "^[^:]+\([0-9]+,[0-9]+\): error" tsc-output.txt | while IFS= read -r line; do
+              if [[ $line =~ ^([^\(]+)\(([0-9]+),([0-9]+)\):[[:space:]]error[[:space:]](TS[0-9]+):[[:space:]](.+)$ ]]; then
+                file="${BASH_REMATCH[1]}"
+                linenum="${BASH_REMATCH[2]}"
+                colnum="${BASH_REMATCH[3]}"
+                errorcode="${BASH_REMATCH[4]}"
+                message="${BASH_REMATCH[5]}"
+                echo "::error file=${file},line=${linenum},col=${colnum},title=TypeScript ${errorcode}::${message}"
+              fi
+            done
+            
+            # Add summary
+            echo "TypeScript errors:" >> $GITHUB_STEP_SUMMARY
+            echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+            cat tsc-output.txt >> $GITHUB_STEP_SUMMARY
+            echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+            exit 1
+          fi
+
       - name: Run Prettier format check
         id: prettier
         run: |
