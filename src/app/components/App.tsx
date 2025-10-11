@@ -270,7 +270,12 @@ function IngameInterface(props: {
   };
   return (
     <>
-      <TabHeader currentTurn={currentTurn} nextTurn={nextTurn} />
+      <TabHeader
+        currentTurn={currentTurn}
+        nextTurn={nextTurn}
+        players={props.state.players}
+        rollsLength={props.state.rolls.length}
+      />
       <Tabs value={tab} onChange={handleChange} variant="fullWidth">
         <Tab label="Würfel" value="DICE" />
         <Tab label="Siedlungen" value="SETTLEMENTS" />
