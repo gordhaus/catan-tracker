@@ -1,8 +1,7 @@
 import { Button, Divider, Grid } from "@mui/material";
 import { updateState } from "../localStorage";
 import type { State } from "./App";
-
-const diceOutcomes = [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12] as const;
+import { DICE_OUTCOMES } from "../lib/diceConstants";
 
 interface DiceTabProps {
   state: State;
@@ -13,7 +12,7 @@ export function DiceTab(props: DiceTabProps) {
   return (
     <>
       <Grid container spacing={2}>
-        {diceOutcomes.map((outcome) => (
+        {DICE_OUTCOMES.map((outcome) => (
           <Grid key={outcome} size={4}>
             <Button
               variant="contained"

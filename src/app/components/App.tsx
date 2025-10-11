@@ -25,10 +25,10 @@ import {
 import styles from "../page.module.css";
 import {
   ResourceNumberSelector,
-  type DiceOutcome,
   type Resource,
   type OptionalFieldValue,
 } from "./ResourceNumberSelector";
+import { type DiceOutcome } from "../lib/diceConstants";
 import { DiceTab } from "./DiceTab";
 import { SettlementsTab } from "./SettlementsTab";
 import { StatsTab } from "./StatsTab";
@@ -161,10 +161,10 @@ function CreateSettlement(props: CreateSettlementProps) {
                     state.settlements.length === 0
                       ? 0
                       : Math.max(
-                          ...state.settlements.map(
-                            (settlement) => settlement.id
-                          )
-                        ) + 1,
+                        ...state.settlements.map(
+                          (settlement) => settlement.id
+                        )
+                      ) + 1,
                   turn,
                   player,
                   income: removeEmptyIncomes(incomes),
@@ -210,8 +210,8 @@ function IngameInterface(props: {
     props.state.rolls.length === 0
       ? undefined
       : props.state.players[
-          (props.state.rolls.length - 1) % props.state.players.length
-        ];
+      (props.state.rolls.length - 1) % props.state.players.length
+      ];
   const nextTurn =
     props.state.players[props.state.rolls.length % props.state.players.length];
 

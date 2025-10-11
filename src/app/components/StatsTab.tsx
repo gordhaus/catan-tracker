@@ -1,23 +1,10 @@
 import { Divider } from "@mui/material";
 import { BarChart } from "@mui/x-charts";
 import type { State } from "./App";
-import type { DiceOutcome } from "./ResourceNumberSelector";
-
-const diceOutcomes = [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12] as const;
-
-const probabilities: Record<DiceOutcome, number> = {
-  2: 1,
-  3: 2,
-  4: 3,
-  5: 4,
-  6: 5,
-  7: 6,
-  8: 5,
-  9: 4,
-  10: 3,
-  11: 2,
-  12: 1,
-};
+import {
+  DICE_OUTCOMES,
+  DICE_OUTCOME_COUNTS,
+} from "../lib/diceConstants";
 
 interface StatsTabProps {
   state: State;
@@ -32,22 +19,22 @@ export function StatsTab(props: StatsTabProps) {
         barLabel={"value"}
         layout="horizontal"
         height={500}
-        yAxis={[{ data: diceOutcomes }]}
+        yAxis={[{ data: DICE_OUTCOMES }]}
         series={[
           {
             id: "expectedId",
             label: "expected",
-            data: diceOutcomes.map(
+            data: DICE_OUTCOMES.map(
               (outcome) =>
                 Math.round(
-                  (probabilities[outcome] * props.state.rolls.length * 10) / 36
+                  (DICE_OUTCOME_COUNTS[outcome] * props.state.rolls.length * 10) / 36
                 ) / 10
             ),
           },
           {
             id: "actualId",
             label: "actual",
-            data: diceOutcomes.map(
+            data: DICE_OUTCOMES.map(
               (outcome) =>
                 props.state.rolls.filter((roll) => roll === outcome).length
             ),
@@ -77,7 +64,7 @@ export function StatsTab(props: StatsTabProps) {
                               ((props.state.rolls.length -
                                 settlement.turn -
                                 1) *
-                                probabilities[income.number]) /
+                                DICE_OUTCOME_COUNTS[income.number]) /
                               36
                           )
                           .reduce((partialSum, a) => partialSum + a, 0)
@@ -114,20 +101,20 @@ export function StatsTab(props: StatsTabProps) {
         barLabel={"value"}
         layout="horizontal"
         height={500}
-        yAxis={[{ data: diceOutcomes }]}
+        yAxis={[{ data: DICE_OUTCOMES }]}
         series={[
           {
             id: "expectedId",
             label: "expected",
-            data: diceOutcomes.map(
+            data: DICE_OUTCOMES.map(
               (outcome) =>
-                Math.round((probabilities[outcome] * 18 * 10) / 36) / 10
+                Math.round((DICE_OUTCOME_COUNTS[outcome] * 18 * 10) / 36) / 10
             ),
           },
           {
             id: "actualId",
             label: "actual",
-            data: diceOutcomes.map(
+            data: DICE_OUTCOMES.map(
               (outcome) =>
                 props.state.rolls
                   .slice(undefined, 18)
@@ -157,7 +144,7 @@ export function StatsTab(props: StatsTabProps) {
                           .map(
                             (income) =>
                               ((18 - settlement.turn - 1) *
-                                probabilities[income.number]) /
+                                DICE_OUTCOME_COUNTS[income.number]) /
                               36
                           )
                           .reduce((partialSum, a) => partialSum + a, 0)
