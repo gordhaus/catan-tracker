@@ -1,7 +1,9 @@
-import { Button, Divider, Paper, Typography, Box } from "@mui/material";
+import { Divider, Paper, Typography, Box } from "@mui/material";
 import { motion, AnimatePresence } from "motion/react";
 import type { State } from "./App";
 import { DICE_OUTCOMES } from "../lib/diceConstants";
+import { DiceNumber } from "./DiceNumber";
+import { DiceCell } from "./DiceCell";
 
 interface DiceTabProps {
   state: State;
@@ -40,7 +42,7 @@ export function DiceTab(props: DiceTabProps) {
         sx={{
           display: "flex",
           justifyContent: "center",
-          mb: 2,
+          mb: 4,
           px: 2,
         }}
       >
@@ -56,9 +58,9 @@ export function DiceTab(props: DiceTabProps) {
           }}
         >
           {DICE_OUTCOMES.map((outcome) => (
-            <Button
+            <DiceCell
               key={outcome}
-              variant="contained"
+              size={64}
               onClick={() =>
                 props.setState((state) => ({
                   ...state,
@@ -66,17 +68,17 @@ export function DiceTab(props: DiceTabProps) {
                 }))
               }
               sx={{
-                width: "64px",
-                height: "64px",
-                fontSize: "1.2rem",
-                fontWeight: "bold",
+                backgroundColor: "grey.100",
+                "&:hover": {
+                  backgroundColor: "grey.200",
+                },
               }}
             >
-              {outcome}
-            </Button>
+              <DiceNumber value={outcome} variant="button" />
+            </DiceCell>
           ))}
-          <Button
-            variant="outlined"
+          <DiceCell
+            size={64}
             onClick={() =>
               props.setState((state) => ({
                 ...state,
@@ -84,22 +86,28 @@ export function DiceTab(props: DiceTabProps) {
               }))
             }
             sx={{
-              width: "64px",
-              height: "64px",
+              backgroundColor: "background.paper",
+              border: "1px solid",
+              borderColor: "divider",
+              "&:hover": {
+                backgroundColor: "action.hover",
+              },
             }}
           >
-            ↶
-          </Button>
+            <Typography variant="h5" fontWeight="bold">
+              ↶
+            </Typography>
+          </DiceCell>
         </Box>
       </Box>
-      <Divider sx={{ mb: 2 }} />
+      <Divider sx={{ mb: 4 }} />
       <Box sx={{ px: 2 }}>
         {/* Create a CSS Grid container */}
         <Box
           sx={{
             display: "grid",
             gridTemplateColumns: `repeat(${numPlayers}, 1fr)`,
-            gap: 0.5,
+            gap: 1,
           }}
         >
           {/* Header row - fixed, no animation */}
@@ -131,16 +139,17 @@ export function DiceTab(props: DiceTabProps) {
                 animate={{ opacity: 1, scale: 1 }}
                 exit={{ opacity: 0, scale: 0.8 }}
                 transition={{ duration: 0.3, ease: "easeInOut" }}
+                style={{
+                  display: "flex",
+                  justifyContent: "center",
+                  alignItems: "center",
+                }}
               >
-                <Paper
-                  elevation={0}
+                <DiceCell
+                  size={48}
                   sx={{
-                    padding: 0.75,
+                    padding: 1,
                     textAlign: "center",
-                    minHeight: "40px",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
                     backgroundColor:
                       cell.type === "next"
                         ? "action.hover"
@@ -155,22 +164,19 @@ export function DiceTab(props: DiceTabProps) {
                           : "1px solid",
                     borderColor:
                       cell.type === "next" ? "primary.main" : "divider",
-                    position: "relative",
                   }}
                 >
-                  <Typography
-                    variant="body1"
-                    fontWeight="bold"
-                    color={
-                      cell.type === "next" ? "text.secondary" : "text.primary"
-                    }
-                  >
-                    {cell.type === "next"
-                      ? ""
-                      : cell.type === "roll"
-                        ? cell.value
-                        : ""}
-                  </Typography>
+                  {cell.type === "next" ? (
+                    <Typography
+                      variant="body1"
+                      fontWeight="bold"
+                      color="text.secondary"
+                    >
+                      →
+                    </Typography>
+                  ) : cell.type === "roll" && cell.value ? (
+                    <DiceNumber value={cell.value} />
+                  ) : null}
                   {cell.type === "roll" && (
                     <Typography
                       variant="caption"
@@ -179,13 +185,13 @@ export function DiceTab(props: DiceTabProps) {
                         bottom: 2,
                         right: 4,
                         opacity: 0.4,
-                        fontSize: "0.65rem",
+                        fontSize: "0.5rem",
                       }}
                     >
                       {cell.turnNumber}
                     </Typography>
                   )}
-                </Paper>
+                </DiceCell>
               </motion.div>
             ))}
           </AnimatePresence>

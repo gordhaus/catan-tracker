@@ -1,5 +1,6 @@
 "use client";
 import {
+  Box,
   Button,
   Dialog,
   DialogActions,
@@ -165,8 +166,8 @@ function CreateSettlement(props: CreateSettlementProps) {
                   state.settlements.length === 0
                     ? 0
                     : Math.max(
-                        ...state.settlements.map((settlement) => settlement.id)
-                      ) + 1,
+                      ...state.settlements.map((settlement) => settlement.id)
+                    ) + 1,
                 turn,
                 player,
                 income: removeEmptyIncomes(incomes),
@@ -210,8 +211,8 @@ function IngameInterface(props: {
     props.state.rolls.length === 0
       ? undefined
       : props.state.players[
-          (props.state.rolls.length - 1) % props.state.players.length
-        ];
+      (props.state.rolls.length - 1) % props.state.players.length
+      ];
   const nextTurn =
     props.state.players[props.state.rolls.length % props.state.players.length];
 
@@ -276,35 +277,41 @@ function IngameInterface(props: {
         players={props.state.players}
         rollsLength={props.state.rolls.length}
       />
-      <Tabs value={tab} onChange={handleChange} variant="fullWidth">
-        <Tab label="Würfel" value="DICE" />
-        <Tab label="Siedlungen" value="SETTLEMENTS" />
-        <Tab label="Stats" value="STATS" />
-      </Tabs>
-      {tab === "DICE" && (
-        <DiceTab state={props.state} setState={props.setState} />
-      )}
-      {tab === "SETTLEMENTS" && (
-        <SettlementsTab
-          state={props.state}
-          setState={props.setState}
-          CreateSettlement={
-            <CreateSettlement
-              key={props.state.rolls.length}
-              state={props.state}
-              setState={props.setState}
-              turn={props.state.rolls.length - 1}
-              playerOnTurn={currentTurn}
-            />
-          }
-        />
-      )}
-      {tab === "STATS" && (
-        <StatsTab state={props.state} setState={props.setState} />
-      )}
-      <Divider></Divider>
-      <Button onClick={() => downloadState()}>Exportieren</Button>
-      <Button onClick={() => setOpenDialog(true)}>Neue Session</Button>
+      <Box sx={{ mt: 1 }}>
+        <Tabs value={tab} onChange={handleChange} variant="fullWidth">
+          <Tab label="Würfel" value="DICE" />
+          <Tab label="Siedlungen" value="SETTLEMENTS" />
+          <Tab label="Stats" value="STATS" />
+        </Tabs>
+      </Box>
+      <Box sx={{ mt: 4 }}>
+        {tab === "DICE" && (
+          <DiceTab state={props.state} setState={props.setState} />
+        )}
+        {tab === "SETTLEMENTS" && (
+          <SettlementsTab
+            state={props.state}
+            setState={props.setState}
+            CreateSettlement={
+              <CreateSettlement
+                key={props.state.rolls.length}
+                state={props.state}
+                setState={props.setState}
+                turn={props.state.rolls.length - 1}
+                playerOnTurn={currentTurn}
+              />
+            }
+          />
+        )}
+        {tab === "STATS" && (
+          <StatsTab state={props.state} setState={props.setState} />
+        )}
+      </Box>
+      <Box sx={{ mt: 8, display: 'flex', flexDirection: 'column', gap: 4 }}>
+        <Divider />
+        <Button onClick={() => downloadState()}>Exportieren</Button>
+        <Button onClick={() => setOpenDialog(true)}>Neue Session</Button>
+      </Box>
       <Dialog open={openDialog} onClose={closeDialog}>
         <DialogTitle>Wirklich neue Session?</DialogTitle>
         <DialogContent>
