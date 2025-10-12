@@ -7,7 +7,6 @@ import {
   DialogContent,
   DialogContentText,
   DialogTitle,
-  Divider,
   FormControl,
   InputLabel,
   MenuItem,
@@ -273,7 +272,12 @@ function IngameInterface(props: {
   };
   return (
     <>
-      <TabHeader currentTurn={currentTurn} nextTurn={nextTurn} />
+      <TabHeader
+        currentTurn={currentTurn}
+        nextTurn={nextTurn}
+        onExport={downloadState}
+        onNewSession={() => setOpenDialog(true)}
+      />
       <Box sx={{ mt: 1 }}>
         <Tabs value={tab} onChange={handleChange} variant="fullWidth">
           <Tab label="Würfel" value="DICE" />
@@ -281,7 +285,7 @@ function IngameInterface(props: {
           <Tab label="Stats" value="STATS" />
         </Tabs>
       </Box>
-      <Box sx={{ mt: 4 }}>
+      <Box sx={{ mt: 4, mb: 4 }}>
         {tab === "DICE" && (
           <DiceTab state={props.state} setState={props.setState} />
         )}
@@ -303,11 +307,6 @@ function IngameInterface(props: {
         {tab === "STATS" && (
           <StatsTab state={props.state} setState={props.setState} />
         )}
-      </Box>
-      <Box sx={{ mt: 8, display: "flex", flexDirection: "column", gap: 4 }}>
-        <Divider />
-        <Button onClick={() => downloadState()}>Exportieren</Button>
-        <Button onClick={() => setOpenDialog(true)}>Neue Session</Button>
       </Box>
       <Dialog open={openDialog} onClose={closeDialog}>
         <DialogTitle>Wirklich neue Session?</DialogTitle>
