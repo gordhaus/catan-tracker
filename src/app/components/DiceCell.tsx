@@ -33,7 +33,7 @@ export function DiceCell({
         position: "relative",
         ...(isClickable && {
           cursor: "pointer",
-          transition: "all 0.2s ease-in-out",
+          transition: "transform 0.1s ease-out",
           "&:hover": {
             transform: "scale(1.05)",
           },

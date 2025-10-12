@@ -5,9 +5,14 @@ body {
   margin: 0;
   padding: 0;
   font-family: var(--font-geist-sans), system-ui, sans-serif;
+  touch-action: manipulation; /* Disable 300ms tap delay */
 }
 
 code,
 pre {
   font-family: var(--font-geist-mono), monospace;
+}
+
+* {
+  -webkit-tap-highlight-color: transparent; /* Remove tap highlight */
 }

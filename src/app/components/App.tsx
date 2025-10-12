@@ -166,8 +166,8 @@ function CreateSettlement(props: CreateSettlementProps) {
                   state.settlements.length === 0
                     ? 0
                     : Math.max(
-                      ...state.settlements.map((settlement) => settlement.id)
-                    ) + 1,
+                        ...state.settlements.map((settlement) => settlement.id)
+                      ) + 1,
                 turn,
                 player,
                 income: removeEmptyIncomes(incomes),
@@ -211,8 +211,8 @@ function IngameInterface(props: {
     props.state.rolls.length === 0
       ? undefined
       : props.state.players[
-      (props.state.rolls.length - 1) % props.state.players.length
-      ];
+          (props.state.rolls.length - 1) % props.state.players.length
+        ];
   const nextTurn =
     props.state.players[props.state.rolls.length % props.state.players.length];
 
@@ -307,7 +307,7 @@ function IngameInterface(props: {
           <StatsTab state={props.state} setState={props.setState} />
         )}
       </Box>
-      <Box sx={{ mt: 8, display: 'flex', flexDirection: 'column', gap: 4 }}>
+      <Box sx={{ mt: 8, display: "flex", flexDirection: "column", gap: 4 }}>
         <Divider />
         <Button onClick={() => downloadState()}>Exportieren</Button>
         <Button onClick={() => setOpenDialog(true)}>Neue Session</Button>

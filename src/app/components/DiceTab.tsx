@@ -72,6 +72,10 @@ export function DiceTab(props: DiceTabProps) {
                 "&:hover": {
                   backgroundColor: "grey.200",
                 },
+                "&:active": {
+                  backgroundColor: "primary.light",
+                  transform: "scale(0.95)",
+                },
               }}
             >
               <DiceNumber value={outcome} variant="button" />
@@ -101,7 +105,7 @@ export function DiceTab(props: DiceTabProps) {
         </Box>
       </Box>
       <Divider sx={{ mb: 4 }} />
-      <Box sx={{ px: 2 }}>
+      <Box sx={{ px: 2, mb: 8 }}>
         {/* Create a CSS Grid container */}
         <Box
           sx={{
@@ -138,7 +142,7 @@ export function DiceTab(props: DiceTabProps) {
                 initial={{ opacity: 0, scale: 0.8 }}
                 animate={{ opacity: 1, scale: 1 }}
                 exit={{ opacity: 0, scale: 0.8 }}
-                transition={{ duration: 0.3, ease: "easeInOut" }}
+                transition={{ duration: 0.2, ease: "easeOut" }}
                 style={{
                   display: "flex",
                   justifyContent: "center",
