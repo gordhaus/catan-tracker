@@ -77,11 +77,6 @@ export interface AdaptiveDiceOptions {
    * Keeps you anchored and prevents over-correction.
    */
   epsilon?: number;
-  /**
-   * If true (default), rebuild the alias table every roll for maximum responsiveness.
-   * If false, you can call .rebuild() manually (e.g., every k steps) to amortize cost.
-   */
-  rebuildEachRoll?: boolean;
 }
 
 /** Minimal stats snapshot for diagnostics/UI. */
@@ -114,9 +109,7 @@ export interface AdaptiveDiceState {
   beta?: number;
   eta?: number;
   epsilon?: number;
-  counts?: number[];
-  emaErrors?: number[];
-  t?: number;
+  rolls?: DiceOutcome[]; // Store actual roll sequence instead of counts
 }
 
 /** Serializable state for ShuffleBagDice */
@@ -270,13 +263,11 @@ export class AdaptiveDice {
   private readonly beta: number;
   private readonly eta: number;
   private readonly epsilon: number;
-  private readonly rebuildEachRoll: boolean;
 
   private readonly rng: RNG;
   private readonly alias: Alias;
 
-  private t: number;
-  private counts: number[];
+  private rolls: DiceOutcome[]; // Actual roll sequence
   private e: number[]; // EMA errors
   private q: number[]; // last used distribution
 
@@ -292,7 +283,6 @@ export class AdaptiveDice {
     this.beta = state?.beta ?? options?.beta ?? 0.4;
     this.eta = state?.eta ?? options?.eta ?? 20.0;
     this.epsilon = state?.epsilon ?? options?.epsilon ?? 0.01;
-    this.rebuildEachRoll = options?.rebuildEachRoll ?? true;
 
     // Validate parameters:
 
@@ -307,24 +297,64 @@ export class AdaptiveDice {
     }
 
     this.rng = rng;
-    this.t = state?.t ?? 0;
-    this.counts = state?.counts ?? new Array(SUMS.length).fill(0);
-    this.e = state?.emaErrors ?? new Array(SUMS.length).fill(0);
+    this.rolls = state?.rolls ?? [];
+    this.e = new Array(SUMS.length).fill(0);
     this.q = TARGET_P.slice();
+
+    // Rebuild state from roll history
+    if (this.rolls.length > 0) {
+      this.rebuildFromRolls();
+    }
 
     this.alias = new Alias(this.q, this.rng);
   }
 
-  /** Current sampling distribution q (normalized). */
-  private computeQ(): number[] {
-    // Update EMA error against target using current empirical shares
-    const denom = Math.max(1, this.t); // avoid division by zero at t=0
-    for (let k = 0; k < this.e.length; k++) {
-      const empirical = this.counts[k] / denom;
-      this.e[k] =
-        (1 - this.beta) * this.e[k] + this.beta * (empirical - TARGET_P[k]);
+  /** Compute counts from roll history */
+  private getCounts(): number[] {
+    const counts = new Array(SUMS.length).fill(0);
+    for (const roll of this.rolls) {
+      const idx = roll - 2;
+      counts[idx]++;
+    }
+    return counts;
+  }
+
+  /** Rebuild EMA errors and weights from roll history */
+  private rebuildFromRolls(upToIndex?: number): void {
+    // Reset EMA errors
+    this.e.fill(0);
+
+    const rollsToProcess = upToIndex !== undefined 
+      ? this.rolls.slice(0, upToIndex)
+      : this.rolls;
+
+    if (rollsToProcess.length === 0) {
+      this.q = TARGET_P.slice();
+      return;
     }
 
+    // Replay rolls to rebuild EMA state
+    const counts = new Array(SUMS.length).fill(0);
+    let t = 0;
+
+    for (const roll of rollsToProcess) {
+      const idx = roll - 2;
+      counts[idx]++;
+      t++;
+
+      // Update EMA errors incrementally
+      for (let k = 0; k < this.e.length; k++) {
+        const empirical = counts[k] / t;
+        this.e[k] = (1 - this.beta) * this.e[k] + this.beta * (empirical - TARGET_P[k]);
+      }
+    }
+
+    // Compute final weights
+    this.computeWeights();
+  }
+
+  /** Compute weights from current EMA errors */
+  private computeWeights(): void {
     // Multiplicative-weights correction around the target
     let w = this.e.map((ek, k) => TARGET_P[k] * Math.exp(-this.eta * ek));
     const wSum = w.reduce((a, b) => a + b, 0);
@@ -336,12 +366,11 @@ export class AdaptiveDice {
       (wk, k) => (1 - this.epsilon) * wk + this.epsilon * TARGET_P[k]
     );
     const qSum = q.reduce((a, b) => a + b, 0);
-    return q.map((x) => x / qSum);
+    this.q = q.map((x) => x / qSum);
   }
 
-  /** Rebuild internal alias table from the latest q (useful if rebuildEachRoll=false). */
+  /** Rebuild internal alias table from current weights */
   rebuild(): void {
-    this.q = this.computeQ();
     this.alias.build(this.q);
   }
 
@@ -350,12 +379,24 @@ export class AdaptiveDice {
    * @returns The sum (integer 2..12).
    */
   roll(): DiceOutcome {
-    if (this.rebuildEachRoll) this.rebuild();
     const idx = this.alias.sampleIndex(); // 0..10
     const sum = SUMS[idx];
-    // Bookkeeping
-    this.t += 1;
-    this.counts[idx] += 1;
+    
+    // Add to roll history
+    this.rolls.push(ensureDiceOutcome(sum));
+    
+    // Update EMA errors incrementally for the new roll
+    const counts = this.getCounts();
+    const t = this.rolls.length;
+    for (let k = 0; k < this.e.length; k++) {
+      const empirical = counts[k] / t;
+      this.e[k] = (1 - this.beta) * this.e[k] + this.beta * (empirical - TARGET_P[k]);
+    }
+    
+    // Recompute weights and rebuild alias table
+    this.computeWeights();
+    this.rebuild();
+    
     return ensureDiceOutcome(sum);
   }
 
@@ -376,11 +417,13 @@ export class AdaptiveDice {
 
   /** Get a snapshot of usage statistics and the last distribution q. */
   stats(): DiceStats {
-    const empirical = this.counts.map((c) => (this.t ? c / this.t : 0));
+    const counts = this.getCounts();
+    const t = this.rolls.length;
+    const empirical = counts.map((c) => (t ? c / t : 0));
     const diff = empirical.map((x, k) => x - TARGET_P[k]);
     return {
-      t: this.t,
-      counts: this.counts.slice(),
+      t,
+      counts,
       empirical,
       diff,
       q: this.q.slice(),
@@ -394,10 +437,26 @@ export class AdaptiveDice {
       beta: this.beta,
       eta: this.eta,
       epsilon: this.epsilon,
-      counts: this.counts.slice(),
-      emaErrors: this.e.slice(),
-      t: this.t,
+      rolls: this.rolls.slice(),
     };
+  }
+
+  /**
+   * Undo the last roll.
+   * Removes the last roll from history and rebuilds state from scratch.
+   * This ensures perfect weight reconstruction.
+   */
+  undo(): void {
+    if (this.rolls.length === 0) {
+      throw new Error("Cannot undo: no rolls have been made");
+    }
+
+    // Remove last roll
+    this.rolls.pop();
+
+    // Rebuild state from remaining rolls
+    this.rebuildFromRolls();
+    this.rebuild();
   }
 }
 
@@ -494,6 +553,17 @@ export class ShuffleBagDice {
       bagPtr: this.ptr,
     };
   }
+
+  /**
+   * Undo the last roll by moving the pointer back.
+   * Note: Can only undo if ptr > 0 (not at the start of bag).
+   */
+  undo(): void {
+    if (this.ptr === 0) {
+      throw new Error("Cannot undo: at start of bag");
+    }
+    this.ptr -= 1;
+  }
 }
 
 /* ============================ Functional API ============================ */
@@ -527,6 +597,34 @@ export function roll(state: DiceState): {
     const dice = new ShuffleBagDice(state, rng);
     const outcome = ensureDiceOutcome(dice.roll());
     return { state: dice.toState(), outcome };
+  }
+
+  // TypeScript exhaustiveness check
+  const _exhaustive: never = state;
+  throw new Error(`Unknown dice mode: ${(_exhaustive as DiceState).mode}`);
+}
+
+/**
+ * Undo the last roll for a given dice state.
+ * For real-life mode, state doesn't change.
+ * For adaptive/shuffle-bag modes, delegates to the class methods.
+ */
+export function undo(state: DiceState): DiceState {
+  if (state.mode === "real-life") {
+    // Real-life dice has no internal state to undo
+    return state;
+  }
+
+  if (state.mode === "adaptive") {
+    const dice = new AdaptiveDice(state);
+    dice.undo();
+    return dice.toState();
+  }
+
+  if (state.mode === "shuffle-bag") {
+    const dice = new ShuffleBagDice(state);
+    dice.undo();
+    return dice.toState();
   }
 
   // TypeScript exhaustiveness check
