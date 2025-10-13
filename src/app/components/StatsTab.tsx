@@ -9,6 +9,8 @@ interface StatsTabProps {
 }
 
 export function StatsTab(props: StatsTabProps) {
+  const rolls = props.state.diceState.rolls ?? [];
+
   return (
     <>
       <h3>Würfel</h3>
@@ -24,10 +26,7 @@ export function StatsTab(props: StatsTabProps) {
             data: DICE_OUTCOMES.map(
               (outcome) =>
                 Math.round(
-                  (DICE_OUTCOME_COUNTS[outcome] *
-                    props.state.rolls.length *
-                    10) /
-                    36
+                  (DICE_OUTCOME_COUNTS[outcome] * rolls.length * 10) / 36
                 ) / 10
             ),
           },
@@ -35,8 +34,7 @@ export function StatsTab(props: StatsTabProps) {
             id: "actualId",
             label: "actual",
             data: DICE_OUTCOMES.map(
-              (outcome) =>
-                props.state.rolls.filter((roll) => roll === outcome).length
+              (outcome) => rolls.filter((roll) => roll === outcome).length
             ),
           },
         ]}
@@ -61,9 +59,7 @@ export function StatsTab(props: StatsTabProps) {
                         settlement.income
                           .map(
                             (income) =>
-                              ((props.state.rolls.length -
-                                settlement.turn -
-                                1) *
+                              ((rolls.length - settlement.turn - 1) *
                                 DICE_OUTCOME_COUNTS[income.number]) /
                               36
                           )
@@ -80,7 +76,7 @@ export function StatsTab(props: StatsTabProps) {
               props.state.settlements
                 .filter((settlement) => settlement.player === player)
                 .map((settlement) =>
-                  props.state.rolls
+                  rolls
                     .slice(settlement.turn < 0 ? undefined : settlement.turn)
                     .map(
                       (roll) =>
@@ -116,9 +112,8 @@ export function StatsTab(props: StatsTabProps) {
             label: "actual",
             data: DICE_OUTCOMES.map(
               (outcome) =>
-                props.state.rolls
-                  .slice(undefined, 18)
-                  .filter((roll) => roll === outcome).length
+                rolls.slice(undefined, 18).filter((roll) => roll === outcome)
+                  .length
             ),
           },
         ]}
@@ -160,7 +155,7 @@ export function StatsTab(props: StatsTabProps) {
               props.state.settlements
                 .filter((settlement) => settlement.player === player)
                 .map((settlement) =>
-                  props.state.rolls
+                  rolls
                     .slice(
                       settlement.turn < 0 ? undefined : settlement.turn,
                       18

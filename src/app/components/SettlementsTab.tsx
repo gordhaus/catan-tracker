@@ -66,7 +66,7 @@ export function SettlementsTab(props: SettlementsTabProps) {
                             ...state.settlements,
                             {
                               ...settlement,
-                              turn: props.state.rolls.length - 1,
+                              turn: (state.diceState.rolls ?? []).length - 1,
                               id:
                                 Math.max(
                                   ...state.settlements.map(

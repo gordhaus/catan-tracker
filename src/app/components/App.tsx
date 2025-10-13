@@ -52,7 +52,6 @@ interface Settlement {
 export interface State {
   players: string[];
   settlements: Settlement[];
-  rolls: DiceOutcome[];
   diceState: DiceState;
 }
 
@@ -209,14 +208,13 @@ function IngameInterface(props: {
   state: State;
   setState: React.Dispatch<React.SetStateAction<State>>;
 }) {
+  const rolls = props.state.diceState.rolls ?? [];
   const currentTurn =
-    props.state.rolls.length === 0
+    rolls.length === 0
       ? undefined
-      : props.state.players[
-          (props.state.rolls.length - 1) % props.state.players.length
-        ];
+      : props.state.players[(rolls.length - 1) % props.state.players.length];
   const nextTurn =
-    props.state.players[props.state.rolls.length % props.state.players.length];
+    props.state.players[rolls.length % props.state.players.length];
 
   const [openDialog, setOpenDialog] = useState(false);
   const [tab, setTab] = useState<Tab>("DICE");
@@ -291,10 +289,10 @@ function IngameInterface(props: {
             setState={props.setState}
             CreateSettlement={
               <CreateSettlement
-                key={props.state.rolls.length}
+                key={rolls.length}
                 state={props.state}
                 setState={props.setState}
-                turn={props.state.rolls.length - 1}
+                turn={rolls.length - 1}
                 playerOnTurn={currentTurn}
               />
             }

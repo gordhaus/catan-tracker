@@ -1,20 +1,38 @@
 import { State } from "./components/App";
+import { DiceOutcome } from "./lib/diceConstants";
 
 const LOCAL_STORAGE_KEY = "catan:state";
 
 /**
  * Migrates old state format to current format.
- * Adds diceState field if missing (for users with old saved games).
+ * - Adds diceState field if missing (for users with old saved games)
+ * - Moves rolls from State.rolls to diceState.rolls
  */
-function migrateState(parsedState: any): State {
+function migrateState(parsedState: unknown): State {
+  const state = parsedState as State & { rolls?: DiceOutcome[] };
+  let diceState = state.diceState;
+
   // If diceState is missing, this is an old save - default to real-life mode
-  if (!parsedState.diceState) {
-    return {
-      ...parsedState,
-      diceState: { mode: "real-life" },
+  if (!diceState) {
+    diceState = { mode: "real-life" };
+  }
+
+  // If rolls are in the old location (State.rolls), move them to diceState.rolls
+  if (state.rolls && !diceState.rolls) {
+    diceState = {
+      ...diceState,
+      rolls: state.rolls,
     };
   }
-  return parsedState as State;
+
+  // Remove rolls from top-level state
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const { rolls: _rolls, ...stateWithoutRolls } = state;
+
+  return {
+    ...stateWithoutRolls,
+    diceState,
+  };
 }
 
 export function getState(): State {
@@ -23,8 +41,7 @@ export function getState(): State {
     return {
       settlements: [],
       players: [],
-      rolls: [],
-      diceState: { mode: "real-life" },
+      diceState: { mode: "real-life", rolls: [] },
     };
   }
 
@@ -32,7 +49,7 @@ export function getState(): State {
     const parsedState = JSON.parse(storedState);
     const migratedState = migrateState(parsedState);
     // Save migrated state back to localStorage to update it
-    if (!parsedState.diceState) {
+    if (!parsedState.diceState || parsedState.rolls) {
       saveState(migratedState);
     }
     return migratedState;
@@ -42,8 +59,7 @@ export function getState(): State {
     return {
       settlements: [],
       players: [],
-      rolls: [],
-      diceState: { mode: "real-life" },
+      diceState: { mode: "real-life", rolls: [] },
     };
   }
 }
@@ -88,6 +104,8 @@ export function importState(json: string) {
     window.location.reload();
   } catch (error) {
     console.error("Failed to import state:", error);
-    alert("Fehler beim Importieren der Datei. Bitte überprüfen Sie das Format.");
+    alert(
+      "Fehler beim Importieren der Datei. Bitte überprüfen Sie das Format."
+    );
   }
 }

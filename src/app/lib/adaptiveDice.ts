@@ -79,41 +79,31 @@ export interface AdaptiveDiceOptions {
   epsilon?: number;
 }
 
-/** Minimal stats snapshot for diagnostics/UI. */
-export interface DiceStats {
-  /** Number of rolls so far. */
-  t: number;
-  /** Counts per sum index (index 0 ↔ sum 2, ..., index 10 ↔ sum 12). */
-  counts: number[];
-  /** Empirical frequencies per sum. */
-  empirical: number[];
-  /** Empirical minus target per sum (positive means overrepresented so far). */
-  diff: number[];
-  /** Current sampling distribution q (if available). */
-  q?: number[];
-}
-
 /* ============================ Serializable State Types ============================ */
 
 /** Dice mode type */
 export type DiceMode = "real-life" | "adaptive" | "shuffle-bag";
 
+/** Base interface for dice states that track rolls */
+export interface DiceRolls {
+  rolls?: DiceOutcome[]; // Optional roll history
+}
+
 /** Serializable state for real-life dice mode (no special state needed) */
-export interface RealLifeDiceState {
+export interface RealLifeDiceState extends DiceRolls {
   mode: "real-life";
 }
 
 /** Serializable state for AdaptiveDice */
-export interface AdaptiveDiceState {
+export interface AdaptiveDiceState extends DiceRolls {
   mode: "adaptive";
   beta?: number;
   eta?: number;
   epsilon?: number;
-  rolls?: DiceOutcome[]; // Store actual roll sequence instead of counts
 }
 
 /** Serializable state for ShuffleBagDice */
-export interface ShuffleBagDiceState {
+export interface ShuffleBagDiceState extends DiceRolls {
   mode: "shuffle-bag";
   bagSize?: number;
   currentBag?: number[];
@@ -252,6 +242,58 @@ export class Alias {
   }
 }
 
+/* ============================ Real Dice ============================ */
+
+/**
+ * RealDice: Represents real physical dice with no algorithmic state.
+ * Simply rolls two d6 and keeps track of roll history.
+ */
+export class RealDice {
+  private readonly rng: RNG;
+  private rolls: DiceOutcome[];
+
+  constructor(stateOrRng?: RealLifeDiceState | RNG) {
+    // Check if we're restoring from state or getting an RNG
+    const isState =
+      stateOrRng && typeof stateOrRng === "object" && "mode" in stateOrRng;
+    const state = isState ? (stateOrRng as RealLifeDiceState) : undefined;
+    const rng = !isState && stateOrRng ? (stateOrRng as RNG) : new CryptoRNG();
+
+    this.rng = rng;
+    this.rolls = state?.rolls ?? [];
+  }
+
+  /** Roll two d6 and return the sum */
+  roll(): DiceOutcome {
+    const d1 = this.rng.int(6) + 1;
+    const d2 = this.rng.int(6) + 1;
+    const outcome = ensureDiceOutcome(d1 + d2);
+    this.rolls.push(outcome);
+    return outcome;
+  }
+
+  /** Manually add a specific outcome (for real-life dice input) */
+  addRoll(outcome: DiceOutcome): void {
+    this.rolls.push(outcome);
+  }
+
+  /** Undo the last roll */
+  undo(): void {
+    if (this.rolls.length === 0) {
+      throw new Error("Cannot undo: no rolls have been made");
+    }
+    this.rolls.pop();
+  }
+
+  /** Export current state for serialization */
+  toState(): RealLifeDiceState {
+    return {
+      mode: "real-life",
+      rolls: this.rolls.slice(),
+    };
+  }
+}
+
 /* ============================ Adaptive Dice ============================== */
 
 /**
@@ -324,9 +366,8 @@ export class AdaptiveDice {
     // Reset EMA errors
     this.e.fill(0);
 
-    const rollsToProcess = upToIndex !== undefined 
-      ? this.rolls.slice(0, upToIndex)
-      : this.rolls;
+    const rollsToProcess =
+      upToIndex !== undefined ? this.rolls.slice(0, upToIndex) : this.rolls;
 
     if (rollsToProcess.length === 0) {
       this.q = TARGET_P.slice();
@@ -345,7 +386,8 @@ export class AdaptiveDice {
       // Update EMA errors incrementally
       for (let k = 0; k < this.e.length; k++) {
         const empirical = counts[k] / t;
-        this.e[k] = (1 - this.beta) * this.e[k] + this.beta * (empirical - TARGET_P[k]);
+        this.e[k] =
+          (1 - this.beta) * this.e[k] + this.beta * (empirical - TARGET_P[k]);
       }
     }
 
@@ -381,22 +423,23 @@ export class AdaptiveDice {
   roll(): DiceOutcome {
     const idx = this.alias.sampleIndex(); // 0..10
     const sum = SUMS[idx];
-    
+
     // Add to roll history
     this.rolls.push(ensureDiceOutcome(sum));
-    
+
     // Update EMA errors incrementally for the new roll
     const counts = this.getCounts();
     const t = this.rolls.length;
     for (let k = 0; k < this.e.length; k++) {
       const empirical = counts[k] / t;
-      this.e[k] = (1 - this.beta) * this.e[k] + this.beta * (empirical - TARGET_P[k]);
+      this.e[k] =
+        (1 - this.beta) * this.e[k] + this.beta * (empirical - TARGET_P[k]);
     }
-    
+
     // Recompute weights and rebuild alias table
     this.computeWeights();
     this.rebuild();
-    
+
     return ensureDiceOutcome(sum);
   }
 
@@ -413,21 +456,6 @@ export class AdaptiveDice {
     const d1 = minD1 + this.rng.int(width);
     const d2 = sum - d1;
     return { sum, d1, d2 };
-  }
-
-  /** Get a snapshot of usage statistics and the last distribution q. */
-  stats(): DiceStats {
-    const counts = this.getCounts();
-    const t = this.rolls.length;
-    const empirical = counts.map((c) => (t ? c / t : 0));
-    const diff = empirical.map((x, k) => x - TARGET_P[k]);
-    return {
-      t,
-      counts,
-      empirical,
-      diff,
-      q: this.q.slice(),
-    };
   }
 
   /** Export current state for serialization. */
@@ -488,7 +516,7 @@ export class ShuffleBagDice {
     const isState =
       typeof bagSizeOrState === "object" && "mode" in bagSizeOrState;
     const state = isState ? bagSizeOrState : undefined;
-    const bagSize = isState ? state!.bagSize ?? 36 : bagSizeOrState;
+    const bagSize = isState ? (state!.bagSize ?? 36) : bagSizeOrState;
 
     if (!Number.isInteger(bagSize) || bagSize <= 0) {
       throw new Error("bagSize must be a positive integer");
@@ -580,11 +608,9 @@ export function roll(state: DiceState): {
   const rng = new CryptoRNG();
 
   if (state.mode === "real-life") {
-    // Real dice: just roll two d6
-    const d1 = rng.int(6) + 1;
-    const d2 = rng.int(6) + 1;
-    const outcome = ensureDiceOutcome(d1 + d2);
-    return { state, outcome };
+    const dice = new RealDice(state);
+    const outcome = dice.roll();
+    return { state: dice.toState(), outcome };
   }
 
   if (state.mode === "adaptive") {
@@ -606,13 +632,13 @@ export function roll(state: DiceState): {
 
 /**
  * Undo the last roll for a given dice state.
- * For real-life mode, state doesn't change.
- * For adaptive/shuffle-bag modes, delegates to the class methods.
+ * Removes the last roll from the roll history.
  */
 export function undo(state: DiceState): DiceState {
   if (state.mode === "real-life") {
-    // Real-life dice has no internal state to undo
-    return state;
+    const dice = new RealDice(state);
+    dice.undo();
+    return dice.toState();
   }
 
   if (state.mode === "adaptive") {
@@ -631,4 +657,3 @@ export function undo(state: DiceState): DiceState {
   const _exhaustive: never = state;
   throw new Error(`Unknown dice mode: ${(_exhaustive as DiceState).mode}`);
 }
-

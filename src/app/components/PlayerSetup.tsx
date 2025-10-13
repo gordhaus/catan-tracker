@@ -98,8 +98,7 @@ export function PlayerSetup(props: PlayerSetupProps) {
                 error={
                   error !== "" &&
                   player.trim() === "" &&
-                  index <
-                    players.findLastIndex((p) => p.trim() !== "")
+                  index < players.findLastIndex((p) => p.trim() !== "")
                 }
                 onChange={(event: React.ChangeEvent<HTMLInputElement>) => {
                   const newPlayers = [...players];
