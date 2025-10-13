@@ -15,7 +15,7 @@ import {
   Tabs,
   TextField,
 } from "@mui/material";
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   deleteSession,
   downloadState,
@@ -217,6 +217,49 @@ function IngameInterface(props: {
 
   const [openDialog, setOpenDialog] = useState(false);
   const [tab, setTab] = useState<Tab>("DICE");
+
+  // Screen Wake Lock
+  useEffect(() => {
+    let wakeLock: WakeLockSentinel | null = null;
+
+    const requestWakeLock = async () => {
+      try {
+        if ("wakeLock" in navigator && navigator.wakeLock) {
+          wakeLock = await navigator.wakeLock.request("screen");
+          console.log("Screen Wake Lock active");
+
+          wakeLock.addEventListener("release", () => {
+            console.log("Screen Wake Lock released");
+            wakeLock = null;
+          });
+        }
+      } catch (err) {
+        console.error("Failed to acquire Screen Wake Lock:", err);
+      }
+    };
+
+    // Request wake lock on mount
+    requestWakeLock();
+
+    // Re-acquire wake lock when page becomes visible
+    const handleVisibilityChange = async () => {
+      if (document.visibilityState === "visible" && wakeLock === null) {
+        await requestWakeLock();
+      }
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    // Release wake lock on unmount
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      if (wakeLock !== null) {
+        wakeLock.release().then(() => {
+          wakeLock = null;
+        });
+      }
+    };
+  }, []);
 
   function closeDialog() {
     setOpenDialog(false);
