@@ -98,6 +98,41 @@ export interface DiceStats {
   q?: number[];
 }
 
+/* ============================ Serializable State Types ============================ */
+
+/** Dice mode type */
+export type DiceMode = "real-life" | "adaptive" | "shuffle-bag";
+
+/** Serializable state for real-life dice mode (no special state needed) */
+export interface RealLifeDiceState {
+  mode: "real-life";
+}
+
+/** Serializable state for AdaptiveDice */
+export interface AdaptiveDiceState {
+  mode: "adaptive";
+  beta?: number;
+  eta?: number;
+  epsilon?: number;
+  counts?: number[];
+  emaErrors?: number[];
+  t?: number;
+}
+
+/** Serializable state for ShuffleBagDice */
+export interface ShuffleBagDiceState {
+  mode: "shuffle-bag";
+  bagSize?: number;
+  currentBag?: number[];
+  bagPtr?: number;
+}
+
+/** Discriminated union of all dice mode states */
+export type DiceState =
+  | RealLifeDiceState
+  | AdaptiveDiceState
+  | ShuffleBagDiceState;
+
 /** RNG interface used internally (float in [0,1), int in [0,max)). */
 export interface RNG {
   float01(): number;
@@ -245,11 +280,19 @@ export class AdaptiveDice {
   private e: number[]; // EMA errors
   private q: number[]; // last used distribution
 
-  constructor(options: AdaptiveDiceOptions = {}, rng: RNG = new CryptoRNG()) {
-    this.beta = options.beta ?? 0.4;
-    this.eta = options.eta ?? 20.0;
-    this.epsilon = options.epsilon ?? 0.01;
-    this.rebuildEachRoll = options.rebuildEachRoll ?? true;
+  constructor(
+    optionsOrState?: AdaptiveDiceOptions | AdaptiveDiceState,
+    rng: RNG = new CryptoRNG()
+  ) {
+    // Check if we're restoring from state
+    const isState = optionsOrState && "mode" in optionsOrState;
+    const state = isState ? (optionsOrState as AdaptiveDiceState) : undefined;
+    const options = isState ? {} : (optionsOrState as AdaptiveDiceOptions);
+
+    this.beta = state?.beta ?? options?.beta ?? 0.4;
+    this.eta = state?.eta ?? options?.eta ?? 20.0;
+    this.epsilon = state?.epsilon ?? options?.epsilon ?? 0.01;
+    this.rebuildEachRoll = options?.rebuildEachRoll ?? true;
 
     // Validate parameters:
 
@@ -264,9 +307,9 @@ export class AdaptiveDice {
     }
 
     this.rng = rng;
-    this.t = 0;
-    this.counts = new Array(SUMS.length).fill(0);
-    this.e = new Array(SUMS.length).fill(0);
+    this.t = state?.t ?? 0;
+    this.counts = state?.counts ?? new Array(SUMS.length).fill(0);
+    this.e = state?.emaErrors ?? new Array(SUMS.length).fill(0);
     this.q = TARGET_P.slice();
 
     this.alias = new Alias(this.q, this.rng);
@@ -343,6 +386,19 @@ export class AdaptiveDice {
       q: this.q.slice(),
     };
   }
+
+  /** Export current state for serialization. */
+  toState(): AdaptiveDiceState {
+    return {
+      mode: "adaptive",
+      beta: this.beta,
+      eta: this.eta,
+      epsilon: this.epsilon,
+      counts: this.counts.slice(),
+      emaErrors: this.e.slice(),
+      t: this.t,
+    };
+  }
 }
 
 /* ============================ Shuffle-Bag Dice =========================== */
@@ -363,10 +419,18 @@ export class ShuffleBagDice {
   private ptr = 0;
 
   /**
-   * @param bagSize Total draws per bag. Should be a multiple of 36 for exact proportions (e.g., 36, 72, 108).
+   * @param bagSizeOrState Bag size (number) or serialized state object.
    * @param rng RNG instance (defaults to CryptoRNG).
    */
-  constructor(bagSize: number = 36, rng: RNG = new CryptoRNG()) {
+  constructor(
+    bagSizeOrState: number | ShuffleBagDiceState = 36,
+    rng: RNG = new CryptoRNG()
+  ) {
+    const isState =
+      typeof bagSizeOrState === "object" && "mode" in bagSizeOrState;
+    const state = isState ? bagSizeOrState : undefined;
+    const bagSize = isState ? state!.bagSize ?? 36 : bagSizeOrState;
+
     if (!Number.isInteger(bagSize) || bagSize <= 0) {
       throw new Error("bagSize must be a positive integer");
     }
@@ -377,7 +441,14 @@ export class ShuffleBagDice {
     }
     this.bagSize = bagSize;
     this.rng = rng;
-    this.refill();
+
+    // Restore from state or initialize fresh
+    if (state?.currentBag && state.bagPtr !== undefined) {
+      this.bag = state.currentBag;
+      this.ptr = state.bagPtr;
+    } else {
+      this.refill();
+    }
   }
 
   private refill(): void {
@@ -413,4 +484,53 @@ export class ShuffleBagDice {
     const d2 = sum - d1;
     return { sum, d1, d2 };
   }
+
+  /** Export current state for serialization. */
+  toState(): ShuffleBagDiceState {
+    return {
+      mode: "shuffle-bag",
+      bagSize: this.bagSize,
+      currentBag: this.bag.slice(),
+      bagPtr: this.ptr,
+    };
+  }
 }
+
+/* ============================ Functional API ============================ */
+
+/**
+ * Functional roll API: takes a DiceState, returns updated state and dice outcome.
+ * For real-life mode, generates truly random rolls.
+ * For adaptive/shuffle-bag, maintains algorithm state.
+ */
+export function roll(state: DiceState): {
+  state: DiceState;
+  outcome: DiceOutcome;
+} {
+  const rng = new CryptoRNG();
+
+  if (state.mode === "real-life") {
+    // Real dice: just roll two d6
+    const d1 = rng.int(6) + 1;
+    const d2 = rng.int(6) + 1;
+    const outcome = ensureDiceOutcome(d1 + d2);
+    return { state, outcome };
+  }
+
+  if (state.mode === "adaptive") {
+    const dice = new AdaptiveDice(state, rng);
+    const outcome = dice.roll();
+    return { state: dice.toState(), outcome };
+  }
+
+  if (state.mode === "shuffle-bag") {
+    const dice = new ShuffleBagDice(state, rng);
+    const outcome = ensureDiceOutcome(dice.roll());
+    return { state: dice.toState(), outcome };
+  }
+
+  // TypeScript exhaustiveness check
+  const _exhaustive: never = state;
+  throw new Error(`Unknown dice mode: ${(_exhaustive as DiceState).mode}`);
+}
+

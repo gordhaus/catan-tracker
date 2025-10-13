@@ -30,6 +30,7 @@ import {
   type OptionalFieldValue,
 } from "./ResourceNumberSelector";
 import { type DiceOutcome } from "../lib/diceConstants";
+import { type DiceState } from "../lib/adaptiveDice";
 import { DiceTab } from "./DiceTab";
 import { SettlementsTab } from "./SettlementsTab";
 import { StatsTab } from "./StatsTab";
@@ -52,6 +53,7 @@ export interface State {
   players: string[];
   settlements: Settlement[];
   rolls: DiceOutcome[];
+  diceState: DiceState;
 }
 
 type Tab = "DICE" | "SETTLEMENTS" | "STATS";
