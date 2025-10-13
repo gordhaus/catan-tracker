@@ -38,7 +38,7 @@ export function DiceTab(props: DiceTabProps) {
               updateState(
                 (state) => ({
                   ...state,
-                  rolls: state.rolls.toSpliced(state.rolls.length - 1, 1),
+                  rolls: state.rolls.slice(0, -1),
                 }),
                 props.setState
               )
