@@ -4,7 +4,7 @@ import type { State } from "./App";
 import { DICE_OUTCOMES } from "../lib/diceConstants";
 import { DiceNumber } from "./DiceNumber";
 import { DiceCell } from "./DiceCell";
-import { roll, undo, RealDice, rolls } from "../lib/adaptiveDice";
+import { useDiceOperations } from "../contexts/DiceContext";
 
 interface DiceTabProps {
   state: State;
@@ -12,28 +12,18 @@ interface DiceTabProps {
 }
 
 export function DiceTab(props: DiceTabProps) {
+  const { rolls, mode, roll, undo, addRoll } = useDiceOperations();
   const numPlayers = props.state.players.length;
   const players = [...props.state.players].reverse();
-  const isRealDice = props.state.diceState.mode === "real-life";
+  const isRealDice = mode === "real-life";
 
   const handleDiceRoll = () => {
-    const result = roll(props.state.diceState);
-    props.setState((state) => ({
-      ...state,
-      diceState: result.state,
-    }));
+    roll();
   };
 
   const handleUndo = () => {
-    const rollsArray = rolls(props.state.diceState);
-    if (rollsArray.length === 0) return;
-
-    const newDiceState = undo(props.state.diceState);
-
-    props.setState((state) => ({
-      ...state,
-      diceState: newDiceState,
-    }));
+    if (rolls.length === 0) return;
+    undo();
   };
 
   // Create array with all rolls + empty padding + next indicator
@@ -42,8 +32,7 @@ export function DiceTab(props: DiceTabProps) {
     value?: number;
     turnNumber: number;
   }> = [];
-  const rollsArray = rolls(props.state.diceState);
-  rollsArray.forEach((roll, idx) => {
+  rolls.forEach((roll, idx) => {
     displayCells.push({ type: "roll", value: roll, turnNumber: idx + 1 });
   });
 
@@ -87,15 +76,7 @@ export function DiceTab(props: DiceTabProps) {
                 key={outcome}
                 size={64}
                 onClick={() => {
-                  // For real-life mode, manually add the selected outcome
-                  if (props.state.diceState.mode === "real-life") {
-                    const dice = new RealDice(props.state.diceState);
-                    dice.addRoll(outcome);
-                    props.setState((state) => ({
-                      ...state,
-                      diceState: dice.toState(),
-                    }));
-                  }
+                  addRoll(outcome);
                 }}
                 sx={{
                   backgroundColor: "grey.100",
@@ -139,7 +120,7 @@ export function DiceTab(props: DiceTabProps) {
             }}
           >
             {/* Show last roll result prominently */}
-            {rollsArray.length > 0 && (
+            {rolls.length > 0 && (
               <Box sx={{ textAlign: "center" }}>
                 <Typography
                   variant="caption"
@@ -158,7 +139,7 @@ export function DiceTab(props: DiceTabProps) {
                     boxShadow: 4,
                   }}
                 >
-                  <DiceNumber value={rollsArray[rollsArray.length - 1]} />
+                  <DiceNumber value={rolls[rolls.length - 1]} />
                 </DiceCell>
               </Box>
             )}
@@ -179,7 +160,7 @@ export function DiceTab(props: DiceTabProps) {
               variant="outlined"
               size="small"
               onClick={handleUndo}
-              disabled={rollsArray.length === 0}
+              disabled={rolls.length === 0}
             >
               ↶ Rückgängig
             </Button>

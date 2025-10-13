@@ -16,7 +16,7 @@ import {
   Tabs,
   TextField,
 } from "@mui/material";
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import {
   deleteSession,
   downloadState,
@@ -30,12 +30,13 @@ import {
   type OptionalFieldValue,
 } from "./ResourceNumberSelector";
 import { type DiceOutcome } from "../lib/diceConstants";
-import { type DiceState, rolls } from "../lib/adaptiveDice";
+import { type DiceState } from "../lib/adaptiveDice";
 import { DiceTab } from "./DiceTab";
 import { SettlementsTab } from "./SettlementsTab";
 import { StatsTab } from "./StatsTab";
 import { TabHeader } from "./TabHeader";
 import { PlayerSetup } from "./PlayerSetup";
+import { DiceProvider, useDiceOperations } from "../contexts/DiceContext";
 
 interface Income {
   resource: Resource;
@@ -65,12 +66,33 @@ export default function Home() {
     saveState(state);
   }, [state]);
 
+  // Callback for DiceProvider to update diceState
+  // Note: DiceProvider is a "soft abstraction" - components can also update
+  // diceState directly via setState, and the provider will still work correctly.
+  // However, prefer using useDiceOperations() for better encapsulation.
+  const handleDiceStateChange = useCallback(
+    (newDiceState: DiceState) => {
+      setState((prevState) => ({
+        ...prevState,
+        diceState: newDiceState,
+      }));
+    },
+    [setState]
+  );
+
   return (
     <div className={styles.page}>
       {!state.players.length ? (
         <PlayerSetup setState={setState} />
       ) : (
-        <IngameInterface state={state} setState={setState} />
+        // DiceProvider makes DiceManager available throughout the component tree
+        // Components should use useDiceOperations() to interact with dice state
+        <DiceProvider
+          diceState={state.diceState}
+          onDiceStateChange={handleDiceStateChange}
+        >
+          <IngameInterface state={state} setState={setState} />
+        </DiceProvider>
       )}
     </div>
   );
@@ -208,15 +230,14 @@ function IngameInterface(props: {
   state: State;
   setState: React.Dispatch<React.SetStateAction<State>>;
 }) {
-  const rollsArray = rolls(props.state.diceState);
+  const { rolls } = useDiceOperations();
+
   const currentTurn =
-    rollsArray.length === 0
+    rolls.length === 0
       ? undefined
-      : props.state.players[
-          (rollsArray.length - 1) % props.state.players.length
-        ];
+      : props.state.players[(rolls.length - 1) % props.state.players.length];
   const nextTurn =
-    props.state.players[rollsArray.length % props.state.players.length];
+    props.state.players[rolls.length % props.state.players.length];
 
   const [openDialog, setOpenDialog] = useState(false);
   const [tab, setTab] = useState<Tab>("DICE");
@@ -291,10 +312,10 @@ function IngameInterface(props: {
             setState={props.setState}
             CreateSettlement={
               <CreateSettlement
-                key={rollsArray.length}
+                key={rolls.length}
                 state={props.state}
                 setState={props.setState}
-                turn={rollsArray.length - 1}
+                turn={rolls.length - 1}
                 playerOnTurn={currentTurn}
               />
             }
