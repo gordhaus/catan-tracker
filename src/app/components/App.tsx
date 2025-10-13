@@ -30,7 +30,7 @@ import {
   type OptionalFieldValue,
 } from "./ResourceNumberSelector";
 import { type DiceOutcome } from "../lib/diceConstants";
-import { type DiceState } from "../lib/adaptiveDice";
+import { type DiceState, rolls } from "../lib/adaptiveDice";
 import { DiceTab } from "./DiceTab";
 import { SettlementsTab } from "./SettlementsTab";
 import { StatsTab } from "./StatsTab";
@@ -208,13 +208,15 @@ function IngameInterface(props: {
   state: State;
   setState: React.Dispatch<React.SetStateAction<State>>;
 }) {
-  const rolls = props.state.diceState.rolls ?? [];
+  const rollsArray = rolls(props.state.diceState);
   const currentTurn =
-    rolls.length === 0
+    rollsArray.length === 0
       ? undefined
-      : props.state.players[(rolls.length - 1) % props.state.players.length];
+      : props.state.players[
+          (rollsArray.length - 1) % props.state.players.length
+        ];
   const nextTurn =
-    props.state.players[rolls.length % props.state.players.length];
+    props.state.players[rollsArray.length % props.state.players.length];
 
   const [openDialog, setOpenDialog] = useState(false);
   const [tab, setTab] = useState<Tab>("DICE");
@@ -289,10 +291,10 @@ function IngameInterface(props: {
             setState={props.setState}
             CreateSettlement={
               <CreateSettlement
-                key={rolls.length}
+                key={rollsArray.length}
                 state={props.state}
                 setState={props.setState}
-                turn={rolls.length - 1}
+                turn={rollsArray.length - 1}
                 playerOnTurn={currentTurn}
               />
             }

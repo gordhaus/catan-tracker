@@ -4,7 +4,7 @@ import type { State } from "./App";
 import { DICE_OUTCOMES } from "../lib/diceConstants";
 import { DiceNumber } from "./DiceNumber";
 import { DiceCell } from "./DiceCell";
-import { roll, undo, RealDice } from "../lib/adaptiveDice";
+import { roll, undo, RealDice, rolls } from "../lib/adaptiveDice";
 
 interface DiceTabProps {
   state: State;
@@ -25,8 +25,8 @@ export function DiceTab(props: DiceTabProps) {
   };
 
   const handleUndo = () => {
-    const rolls = props.state.diceState.rolls ?? [];
-    if (rolls.length === 0) return;
+    const rollsArray = rolls(props.state.diceState);
+    if (rollsArray.length === 0) return;
 
     const newDiceState = undo(props.state.diceState);
 
@@ -42,8 +42,8 @@ export function DiceTab(props: DiceTabProps) {
     value?: number;
     turnNumber: number;
   }> = [];
-  const rolls = props.state.diceState.rolls ?? [];
-  rolls.forEach((roll, idx) => {
+  const rollsArray = rolls(props.state.diceState);
+  rollsArray.forEach((roll, idx) => {
     displayCells.push({ type: "roll", value: roll, turnNumber: idx + 1 });
   });
 
@@ -139,7 +139,7 @@ export function DiceTab(props: DiceTabProps) {
             }}
           >
             {/* Show last roll result prominently */}
-            {rolls.length > 0 && (
+            {rollsArray.length > 0 && (
               <Box sx={{ textAlign: "center" }}>
                 <Typography
                   variant="caption"
@@ -158,7 +158,7 @@ export function DiceTab(props: DiceTabProps) {
                     boxShadow: 4,
                   }}
                 >
-                  <DiceNumber value={rolls[rolls.length - 1]} />
+                  <DiceNumber value={rollsArray[rollsArray.length - 1]} />
                 </DiceCell>
               </Box>
             )}
@@ -179,7 +179,7 @@ export function DiceTab(props: DiceTabProps) {
               variant="outlined"
               size="small"
               onClick={handleUndo}
-              disabled={rolls.length === 0}
+              disabled={rollsArray.length === 0}
             >
               ↶ Rückgängig
             </Button>
