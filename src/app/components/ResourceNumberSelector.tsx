@@ -25,8 +25,8 @@ interface ResourceNumberSelectorProps {
 
 export function ResourceNumberSelector(props: ResourceNumberSelectorProps) {
   return (
-    <Box display={"flex"} gap={2} flexDirection={"row"}>
-      <FormControl>
+    <Box display="flex" gap={2} flexDirection="row" sx={{ width: "100%" }}>
+      <FormControl sx={{ flex: 1 }}>
         <InputLabel id={`create-starting-settlement-resource-${props.index}`}>
           Rohstoff {props.index}
         </InputLabel>
@@ -34,7 +34,6 @@ export function ResourceNumberSelector(props: ResourceNumberSelectorProps) {
           value={props.resource}
           label={`Rohstoff ${props.index}`}
           onChange={(event) => props.onResourceChange(event.target.value)}
-          sx={{ width: "150px" }}
         >
           {resources.map((resource) => (
             <MenuItem
@@ -46,17 +45,16 @@ export function ResourceNumberSelector(props: ResourceNumberSelectorProps) {
           ))}
         </Select>
       </FormControl>
-      <FormControl>
+      <FormControl sx={{ minWidth: 120 }}>
         <InputLabel id={`create-starting-settlement-number-${props.index}`}>
-          Zahlenchip {props.index}
+          Zahl {props.index}
         </InputLabel>
         <Select
           value={props.number}
-          label={`Zahlenchip ${props.index}`}
+          label={`Zahl ${props.index}`}
           onChange={(event) => props.onNumberChange(event.target.value)}
-          sx={{ width: "150px" }}
         >
-          {DICE_OUTCOMES.map((number) => (
+          {DICE_OUTCOMES.filter((number) => number !== 7).map((number) => (
             <MenuItem key={`chip-${props.index}-${number}`} value={number}>
               {number}
             </MenuItem>
