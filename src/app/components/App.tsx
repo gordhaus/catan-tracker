@@ -1,5 +1,7 @@
 "use client";
 import {
+  BottomNavigation,
+  BottomNavigationAction,
   Box,
   Button,
   Dialog,
@@ -11,10 +13,11 @@ import {
   InputLabel,
   MenuItem,
   Select,
-  Tab,
-  Tabs,
   TextField,
 } from "@mui/material";
+import CasinoIcon from "@mui/icons-material/Casino";
+import HomeIcon from "@mui/icons-material/Home";
+import BarChartIcon from "@mui/icons-material/BarChart";
 import React, { useState, useEffect } from "react";
 import {
   deleteSession,
@@ -278,14 +281,7 @@ function IngameInterface(props: {
         onExport={downloadState}
         onNewSession={() => setOpenDialog(true)}
       />
-      <Box sx={{ mt: 1 }}>
-        <Tabs value={tab} onChange={handleChange} variant="fullWidth">
-          <Tab label="Würfel" value="DICE" />
-          <Tab label="Siedlungen" value="SETTLEMENTS" />
-          <Tab label="Stats" value="STATS" />
-        </Tabs>
-      </Box>
-      <Box sx={{ mt: 4, mb: 4 }}>
+      <Box sx={{ mt: 2, mb: 10 }}>
         {tab === "DICE" && (
           <DiceTab state={props.state} setState={props.setState} />
         )}
@@ -308,6 +304,36 @@ function IngameInterface(props: {
           <StatsTab state={props.state} setState={props.setState} />
         )}
       </Box>
+      <BottomNavigation
+        value={tab}
+        onChange={handleChange}
+        showLabels
+        sx={{
+          position: "fixed",
+          bottom: 0,
+          left: 0,
+          right: 0,
+          borderTop: 1,
+          borderColor: "divider",
+          boxShadow: 3,
+        }}
+      >
+        <BottomNavigationAction
+          label="Würfel"
+          value="DICE"
+          icon={<CasinoIcon />}
+        />
+        <BottomNavigationAction
+          label="Siedlungen"
+          value="SETTLEMENTS"
+          icon={<HomeIcon />}
+        />
+        <BottomNavigationAction
+          label="Stats"
+          value="STATS"
+          icon={<BarChartIcon />}
+        />
+      </BottomNavigation>
       <Dialog open={openDialog} onClose={closeDialog}>
         <DialogTitle>Wirklich neue Session?</DialogTitle>
         <DialogContent>
