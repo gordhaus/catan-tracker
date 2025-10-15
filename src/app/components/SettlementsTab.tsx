@@ -1,7 +1,7 @@
 import { Box, Button, Divider } from "@mui/material";
 import type { State } from "./App";
 import type { Resource } from "./ResourceNumberSelector";
-import { rolls } from "../lib/adaptiveDice";
+import { useDiceOperations } from "../contexts/DiceContext";
 
 const resourceAbbrev: Record<Resource, string> = {
   WHEAT: "GE",
@@ -19,6 +19,8 @@ interface SettlementsTabProps {
 }
 
 export function SettlementsTab(props: SettlementsTabProps) {
+  const { rolls } = useDiceOperations();
+
   return (
     <>
       {props.CreateSettlement}
@@ -67,7 +69,7 @@ export function SettlementsTab(props: SettlementsTabProps) {
                             ...state.settlements,
                             {
                               ...settlement,
-                              turn: rolls(state.diceState).length - 1,
+                              turn: rolls.length - 1,
                               id:
                                 Math.max(
                                   ...state.settlements.map(

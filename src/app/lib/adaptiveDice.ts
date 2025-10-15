@@ -45,6 +45,9 @@ import {
   type DiceOutcome,
 } from "./diceConstants";
 
+// Re-export DiceOutcome for convenience
+export type { DiceOutcome } from "./diceConstants";
+
 /* =========================== Types & Constants ============================ */
 
 /** The eleven sums we can produce (2..12). */
@@ -606,7 +609,9 @@ export function rolls(state: DiceState): DiceOutcome[] {
   return getDice(state).rolls;
 }
 
-function getDice(state: DiceState): RealDice | AdaptiveDice | ShuffleBagDice {
+export function getDice(
+  state: DiceState
+): RealDice | AdaptiveDice | ShuffleBagDice {
   if (state.mode === "real-life") {
     return new RealDice(state);
   }
@@ -622,6 +627,88 @@ function getDice(state: DiceState): RealDice | AdaptiveDice | ShuffleBagDice {
   // TypeScript exhaustiveness check
   const _exhaustive: never = state;
   throw new Error(`Unknown dice mode: ${(_exhaustive as DiceState).mode}`);
+}
+
+/* ============================ DiceManager Class ============================ */
+
+/**
+ * DiceManager wraps a DiceState and provides method-style access.
+ *
+ * This class bridges OOP-style method calls with React's immutable state model.
+ * It's designed to work within the DiceContext "soft abstraction":
+ *
+ * - Accepts plain DiceState (serializable for localStorage)
+ * - Provides methods that return new state (immutable updates)
+ * - Works correctly whether state changes come through this manager or externally
+ * - Enables natural method-style API: `manager.roll()` vs `roll(state)`
+ *
+ * USAGE:
+ * Typically used via DiceProvider/useDiceOperations() in React components,
+ * but can also be instantiated directly for functional/utility code.
+ *
+ * @example
+ * ```typescript
+ * // In React components (recommended):
+ * const { roll, undo } = useDiceOperations();
+ * roll(); // Automatically updates context state
+ *
+ * // Direct usage (for utilities/tests):
+ * const manager = new DiceManager(diceState);
+ * const [newState, outcome] = manager.roll();
+ * ```
+ */
+export class DiceManager {
+  private state: DiceState;
+  private instance: RealDice | AdaptiveDice | ShuffleBagDice;
+
+  constructor(state: DiceState) {
+    this.state = state;
+    this.instance = getDice(state);
+  }
+
+  /** Get the current state (plain object for serialization) */
+  getState(): DiceState {
+    return this.state;
+  }
+
+  /** Roll the dice and return [newState, outcome] */
+  roll(): [DiceState, DiceOutcome] {
+    const outcome = this.instance.roll();
+    this.state = this.instance.toState();
+    return [this.state, outcome];
+  }
+
+  /** Undo the last roll and return the new state */
+  undo(): DiceState {
+    this.instance.undo();
+    this.state = this.instance.toState();
+    return this.state;
+  }
+
+  /** Manually add a roll (for real-life dice mode only) */
+  addRoll(outcome: DiceOutcome): DiceState {
+    if (this.instance instanceof RealDice) {
+      this.instance.addRoll(outcome);
+      this.state = this.instance.toState();
+      return this.state;
+    }
+    throw new Error("addRoll is only supported in real-life dice mode");
+  }
+
+  /** Get the roll history */
+  get rolls(): DiceOutcome[] {
+    return this.instance.rolls;
+  }
+
+  /** Get the dice mode */
+  get mode(): DiceMode {
+    return this.state.mode;
+  }
+
+  /** Create a new manager with fresh state (for React updates) */
+  static from(state: DiceState): DiceManager {
+    return new DiceManager(state);
+  }
 }
 
 /**
