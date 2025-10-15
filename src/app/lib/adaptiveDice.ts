@@ -77,26 +77,43 @@ export interface AdaptiveDiceOptions {
    * Keeps you anchored and prevents over-correction.
    */
   epsilon?: number;
-  /**
-   * If true (default), rebuild the alias table every roll for maximum responsiveness.
-   * If false, you can call .rebuild() manually (e.g., every k steps) to amortize cost.
-   */
-  rebuildEachRoll?: boolean;
 }
 
-/** Minimal stats snapshot for diagnostics/UI. */
-export interface DiceStats {
-  /** Number of rolls so far. */
-  t: number;
-  /** Counts per sum index (index 0 ↔ sum 2, ..., index 10 ↔ sum 12). */
-  counts: number[];
-  /** Empirical frequencies per sum. */
-  empirical: number[];
-  /** Empirical minus target per sum (positive means overrepresented so far). */
-  diff: number[];
-  /** Current sampling distribution q (if available). */
-  q?: number[];
+/* ============================ Serializable State Types ============================ */
+
+/** Dice mode type */
+export type DiceMode = "real-life" | "adaptive" | "shuffle-bag";
+
+/** Base interface for dice states that track rolls */
+export interface DiceRolls {
+  rolls?: DiceOutcome[]; // Optional roll history
 }
+
+/** Serializable state for real-life dice mode (no special state needed) */
+export interface RealLifeDiceState extends DiceRolls {
+  mode: "real-life";
+}
+
+/** Serializable state for AdaptiveDice */
+export interface AdaptiveDiceState extends DiceRolls {
+  mode: "adaptive";
+  beta?: number;
+  eta?: number;
+  epsilon?: number;
+}
+
+/** Serializable state for ShuffleBagDice */
+export interface ShuffleBagDiceState extends DiceRolls {
+  mode: "shuffle-bag";
+  bagSize?: number;
+  bagPtr?: number;
+}
+
+/** Discriminated union of all dice mode states */
+export type DiceState =
+  | RealLifeDiceState
+  | AdaptiveDiceState
+  | ShuffleBagDiceState;
 
 /** RNG interface used internally (float in [0,1), int in [0,max)). */
 export interface RNG {
@@ -224,6 +241,62 @@ export class Alias {
   }
 }
 
+/* ============================ Real Dice ============================ */
+
+/**
+ * RealDice: Represents real physical dice with no algorithmic state.
+ * Simply rolls two d6 and keeps track of roll history.
+ */
+export class RealDice {
+  private readonly rng: RNG;
+  private _rolls: DiceOutcome[];
+
+  constructor(stateOrRng?: RealLifeDiceState | RNG) {
+    // Check if we're restoring from state or getting an RNG
+    const isState =
+      stateOrRng && typeof stateOrRng === "object" && "mode" in stateOrRng;
+    const state = isState ? (stateOrRng as RealLifeDiceState) : undefined;
+    const rng = !isState && stateOrRng ? (stateOrRng as RNG) : new CryptoRNG();
+
+    this.rng = rng;
+    this._rolls = state?.rolls ?? [];
+  }
+
+  get rolls(): DiceOutcome[] {
+    return this._rolls.slice();
+  }
+
+  /** Roll two d6 and return the sum */
+  roll(): DiceOutcome {
+    const d1 = this.rng.int(6) + 1;
+    const d2 = this.rng.int(6) + 1;
+    const outcome = ensureDiceOutcome(d1 + d2);
+    this._rolls.push(outcome);
+    return outcome;
+  }
+
+  /** Manually add a specific outcome (for real-life dice input) */
+  addRoll(outcome: DiceOutcome): void {
+    this._rolls.push(outcome);
+  }
+
+  /** Undo the last roll */
+  undo(): void {
+    if (this._rolls.length === 0) {
+      throw new Error("Cannot undo: no rolls have been made");
+    }
+    this._rolls.pop();
+  }
+
+  /** Export current state for serialization */
+  toState(): RealLifeDiceState {
+    return {
+      mode: "real-life",
+      rolls: this._rolls.slice(),
+    };
+  }
+}
+
 /* ============================ Adaptive Dice ============================== */
 
 /**
@@ -235,21 +308,26 @@ export class AdaptiveDice {
   private readonly beta: number;
   private readonly eta: number;
   private readonly epsilon: number;
-  private readonly rebuildEachRoll: boolean;
 
   private readonly rng: RNG;
   private readonly alias: Alias;
 
-  private t: number;
-  private counts: number[];
+  protected _rolls: DiceOutcome[]; // Actual roll sequence
   private e: number[]; // EMA errors
   private q: number[]; // last used distribution
 
-  constructor(options: AdaptiveDiceOptions = {}, rng: RNG = new CryptoRNG()) {
-    this.beta = options.beta ?? 0.4;
-    this.eta = options.eta ?? 20.0;
-    this.epsilon = options.epsilon ?? 0.01;
-    this.rebuildEachRoll = options.rebuildEachRoll ?? true;
+  constructor(
+    optionsOrState?: AdaptiveDiceOptions | AdaptiveDiceState,
+    rng: RNG = new CryptoRNG()
+  ) {
+    // Check if we're restoring from state
+    const isState = optionsOrState && "mode" in optionsOrState;
+    const state = isState ? (optionsOrState as AdaptiveDiceState) : undefined;
+    const options = isState ? {} : (optionsOrState as AdaptiveDiceOptions);
+
+    this.beta = state?.beta ?? options?.beta ?? 0.4;
+    this.eta = state?.eta ?? options?.eta ?? 20.0;
+    this.epsilon = state?.epsilon ?? options?.epsilon ?? 0.01;
 
     // Validate parameters:
 
@@ -264,24 +342,68 @@ export class AdaptiveDice {
     }
 
     this.rng = rng;
-    this.t = 0;
-    this.counts = new Array(SUMS.length).fill(0);
+    this._rolls = state?.rolls ?? [];
     this.e = new Array(SUMS.length).fill(0);
     this.q = TARGET_P.slice();
+
+    // Rebuild state from roll history
+    if (this._rolls.length > 0) {
+      this.rebuildFromRolls();
+    }
 
     this.alias = new Alias(this.q, this.rng);
   }
 
-  /** Current sampling distribution q (normalized). */
-  private computeQ(): number[] {
-    // Update EMA error against target using current empirical shares
-    const denom = Math.max(1, this.t); // avoid division by zero at t=0
-    for (let k = 0; k < this.e.length; k++) {
-      const empirical = this.counts[k] / denom;
-      this.e[k] =
-        (1 - this.beta) * this.e[k] + this.beta * (empirical - TARGET_P[k]);
+  get rolls(): DiceOutcome[] {
+    return this._rolls.slice();
+  }
+
+  /** Compute counts from roll history */
+  private getCounts(): number[] {
+    const counts = new Array(SUMS.length).fill(0);
+    for (const roll of this._rolls) {
+      const idx = roll - 2;
+      counts[idx]++;
+    }
+    return counts;
+  }
+
+  /** Rebuild EMA errors and weights from roll history */
+  private rebuildFromRolls(upToIndex?: number): void {
+    // Reset EMA errors
+    this.e.fill(0);
+
+    const rollsToProcess =
+      upToIndex !== undefined ? this._rolls.slice(0, upToIndex) : this._rolls;
+
+    if (rollsToProcess.length === 0) {
+      this.q = TARGET_P.slice();
+      return;
     }
 
+    // Replay rolls to rebuild EMA state
+    const counts = new Array(SUMS.length).fill(0);
+    let t = 0;
+
+    for (const roll of rollsToProcess) {
+      const idx = roll - 2;
+      counts[idx]++;
+      t++;
+
+      // Update EMA errors incrementally
+      for (let k = 0; k < this.e.length; k++) {
+        const empirical = counts[k] / t;
+        this.e[k] =
+          (1 - this.beta) * this.e[k] + this.beta * (empirical - TARGET_P[k]);
+      }
+    }
+
+    // Compute final weights
+    this.computeWeights();
+  }
+
+  /** Compute weights from current EMA errors */
+  private computeWeights(): void {
     // Multiplicative-weights correction around the target
     let w = this.e.map((ek, k) => TARGET_P[k] * Math.exp(-this.eta * ek));
     const wSum = w.reduce((a, b) => a + b, 0);
@@ -293,12 +415,11 @@ export class AdaptiveDice {
       (wk, k) => (1 - this.epsilon) * wk + this.epsilon * TARGET_P[k]
     );
     const qSum = q.reduce((a, b) => a + b, 0);
-    return q.map((x) => x / qSum);
+    this.q = q.map((x) => x / qSum);
   }
 
-  /** Rebuild internal alias table from the latest q (useful if rebuildEachRoll=false). */
+  /** Rebuild internal alias table from current weights */
   rebuild(): void {
-    this.q = this.computeQ();
     this.alias.build(this.q);
   }
 
@@ -307,41 +428,55 @@ export class AdaptiveDice {
    * @returns The sum (integer 2..12).
    */
   roll(): DiceOutcome {
-    if (this.rebuildEachRoll) this.rebuild();
     const idx = this.alias.sampleIndex(); // 0..10
     const sum = SUMS[idx];
-    // Bookkeeping
-    this.t += 1;
-    this.counts[idx] += 1;
+
+    // Add to roll history
+    this._rolls.push(ensureDiceOutcome(sum));
+
+    // Update EMA errors incrementally for the new roll
+    const counts = this.getCounts();
+    const t = this._rolls.length;
+    for (let k = 0; k < this.e.length; k++) {
+      const empirical = counts[k] / t;
+      this.e[k] =
+        (1 - this.beta) * this.e[k] + this.beta * (empirical - TARGET_P[k]);
+    }
+
+    // Recompute weights and rebuild alias table
+    this.computeWeights();
+    this.rebuild();
+
     return ensureDiceOutcome(sum);
   }
 
-  /**
-   * Roll one adapted sum, and also a fair pair (d1,d2) that realizes that sum.
-   * Uniform among all pairs that add to the sampled sum.
-   */
-  rollWithPair(): { sum: number; d1: number; d2: number } {
-    const sum = this.roll();
-    // Sample a fair pair among feasible (d1,d2) with d1,d2∈{1..6}, d1+d2=sum
-    const minD1 = Math.max(1, sum - 6);
-    const maxD1 = Math.min(6, sum - 1);
-    const width = maxD1 - minD1 + 1;
-    const d1 = minD1 + this.rng.int(width);
-    const d2 = sum - d1;
-    return { sum, d1, d2 };
+  /** Export current state for serialization. */
+  toState(): AdaptiveDiceState {
+    return {
+      mode: "adaptive",
+      beta: this.beta,
+      eta: this.eta,
+      epsilon: this.epsilon,
+      rolls: this._rolls.slice(),
+    };
   }
 
-  /** Get a snapshot of usage statistics and the last distribution q. */
-  stats(): DiceStats {
-    const empirical = this.counts.map((c) => (this.t ? c / this.t : 0));
-    const diff = empirical.map((x, k) => x - TARGET_P[k]);
-    return {
-      t: this.t,
-      counts: this.counts.slice(),
-      empirical,
-      diff,
-      q: this.q.slice(),
-    };
+  /**
+   * Undo the last roll.
+   * Removes the last roll from history and rebuilds state from scratch.
+   * This ensures perfect weight reconstruction.
+   */
+  undo(): void {
+    if (this._rolls.length === 0) {
+      throw new Error("Cannot undo: no rolls have been made");
+    }
+
+    // Remove last roll
+    this._rolls.pop();
+
+    // Rebuild state from remaining rolls
+    this.rebuildFromRolls();
+    this.rebuild();
   }
 }
 
@@ -359,14 +494,22 @@ export class ShuffleBagDice {
   private readonly bagSize: number;
   private readonly rng: RNG;
 
-  private bag: number[] = [];
+  private rollsBag: DiceOutcome[] = [];
   private ptr = 0;
 
   /**
-   * @param bagSize Total draws per bag. Should be a multiple of 36 for exact proportions (e.g., 36, 72, 108).
+   * @param bagSizeOrState Bag size (number) or serialized state object.
    * @param rng RNG instance (defaults to CryptoRNG).
    */
-  constructor(bagSize: number = 36, rng: RNG = new CryptoRNG()) {
+  constructor(
+    bagSizeOrState: number | ShuffleBagDiceState = 36,
+    rng: RNG = new CryptoRNG()
+  ) {
+    const isState =
+      typeof bagSizeOrState === "object" && "mode" in bagSizeOrState;
+    const state = isState ? bagSizeOrState : undefined;
+    const bagSize = isState ? (state!.bagSize ?? 36) : bagSizeOrState;
+
     if (!Number.isInteger(bagSize) || bagSize <= 0) {
       throw new Error("bagSize must be a positive integer");
     }
@@ -375,42 +518,124 @@ export class ShuffleBagDice {
         "bagSize should be a multiple of 36 to preserve exact proportions"
       );
     }
-    this.bagSize = bagSize;
+
     this.rng = rng;
-    this.refill();
+    this.bagSize = bagSize;
+    this.ptr = state?.bagPtr ?? 0;
+    if (isState && state!.rolls !== undefined) {
+      this.rollsBag = state!.rolls;
+    }
   }
 
-  private refill(): void {
-    this.bag = [];
+  get rolls(): DiceOutcome[] {
+    return this.rollsBag.slice(0, this.ptr);
+  }
+
+  private extend() {
     const mult = this.bagSize / 36;
+    const offset = this.rollsBag.length;
     for (let i = 0; i < TWO_DICE_COUNTS.length; i++) {
       const copies = TWO_DICE_COUNTS[i] * mult;
-      for (let k = 0; k < copies; k++) this.bag.push(SUMS[i]);
+      for (let k = 0; k < copies; k++) this.rollsBag.push(SUMS[i]);
     }
     // Fisher–Yates using strong RNG
-    for (let i = this.bag.length - 1; i > 0; i--) {
+    for (let i = this.bagSize - 1; i > 0; i--) {
       const j = this.rng.int(i + 1);
-      [this.bag[i], this.bag[j]] = [this.bag[j], this.bag[i]];
+      [this.rollsBag[offset + i], this.rollsBag[offset + j]] = [
+        this.rollsBag[offset + j],
+        this.rollsBag[offset + i],
+      ];
     }
-    this.ptr = 0;
   }
 
   /** Draw one sum from the bag; refills automatically when exhausted. */
-  roll(): number {
-    if (this.ptr >= this.bag.length) this.refill();
-    return this.bag[this.ptr++];
+  roll(): DiceOutcome {
+    if (this.ptr >= this.rollsBag.length) this.extend();
+    return this.rollsBag[this.ptr++];
+  }
+
+  /** Export current state for serialization. */
+  toState(): ShuffleBagDiceState {
+    return {
+      mode: "shuffle-bag",
+      rolls: this.rollsBag.slice(),
+      bagSize: this.bagSize,
+      bagPtr: this.ptr,
+    };
   }
 
   /**
-   * Roll a sum and a fair pair (d1,d2) realizing that sum (uniform among feasible pairs).
+   * Undo the last roll by moving the pointer back.
+   * Note: Can only undo if ptr > 0 (not at the start of bag).
    */
-  rollWithPair(): { sum: number; d1: number; d2: number } {
-    const sum = this.roll();
-    const minD1 = Math.max(1, sum - 6);
-    const maxD1 = Math.min(6, sum - 1);
-    const width = maxD1 - minD1 + 1;
-    const d1 = minD1 + this.rng.int(width);
-    const d2 = sum - d1;
-    return { sum, d1, d2 };
+  undo(): void {
+    if (this.ptr === 0) {
+      throw new Error("Cannot undo: at start of bag");
+    }
+    this.ptr -= 1;
   }
+}
+
+/* ============================ Functional API ============================ */
+
+/**
+ * Functional roll API: takes a DiceState, returns updated state and dice outcome.
+ * For real-life mode, generates truly random rolls.
+ * For adaptive/shuffle-bag, maintains algorithm state.
+ */
+export function roll(state: DiceState): {
+  state: DiceState;
+  outcome: DiceOutcome;
+} {
+  const dice = getDice(state);
+  const outcome = dice.roll();
+  return { state: dice.toState(), outcome };
+}
+
+/**
+ * Undo the last roll for a given dice state.
+ * Removes the last roll from the roll history.
+ */
+export function undo(state: DiceState): DiceState {
+  const dice = getDice(state);
+  dice.undo();
+  return dice.toState();
+}
+
+export function rolls(state: DiceState): DiceOutcome[] {
+  return getDice(state).rolls;
+}
+
+function getDice(state: DiceState): RealDice | AdaptiveDice | ShuffleBagDice {
+  if (state.mode === "real-life") {
+    return new RealDice(state);
+  }
+
+  if (state.mode === "adaptive") {
+    return new AdaptiveDice(state);
+  }
+
+  if (state.mode === "shuffle-bag") {
+    return new ShuffleBagDice(state);
+  }
+
+  // TypeScript exhaustiveness check
+  const _exhaustive: never = state;
+  throw new Error(`Unknown dice mode: ${(_exhaustive as DiceState).mode}`);
+}
+
+/**
+ * Given a sum in 2..12, return a fair (d1,d2) pair with d1,d2∈{1..6}, d1+d2=sum.
+ * Uniform among all feasible pairs.
+ */
+export function pair(
+  sum: DiceOutcome,
+  rng = new CryptoRNG()
+): { d1: number; d2: number } {
+  const minD1 = Math.max(1, sum - 6);
+  const maxD1 = Math.min(6, sum - 1);
+  const width = maxD1 - minD1 + 1;
+  const d1 = minD1 + rng.int(width);
+  const d2 = sum - d1;
+  return { d1, d2 };
 }

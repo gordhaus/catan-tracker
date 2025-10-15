@@ -30,6 +30,7 @@ import {
   type OptionalFieldValue,
 } from "./ResourceNumberSelector";
 import { type DiceOutcome } from "../lib/diceConstants";
+import { type DiceState, rolls } from "../lib/adaptiveDice";
 import { DiceTab } from "./DiceTab";
 import { SettlementsTab } from "./SettlementsTab";
 import { StatsTab } from "./StatsTab";
@@ -51,7 +52,7 @@ interface Settlement {
 export interface State {
   players: string[];
   settlements: Settlement[];
-  rolls: DiceOutcome[];
+  diceState: DiceState;
 }
 
 type Tab = "DICE" | "SETTLEMENTS" | "STATS";
@@ -207,14 +208,15 @@ function IngameInterface(props: {
   state: State;
   setState: React.Dispatch<React.SetStateAction<State>>;
 }) {
+  const rollsArray = rolls(props.state.diceState);
   const currentTurn =
-    props.state.rolls.length === 0
+    rollsArray.length === 0
       ? undefined
       : props.state.players[
-          (props.state.rolls.length - 1) % props.state.players.length
+          (rollsArray.length - 1) % props.state.players.length
         ];
   const nextTurn =
-    props.state.players[props.state.rolls.length % props.state.players.length];
+    props.state.players[rollsArray.length % props.state.players.length];
 
   const [openDialog, setOpenDialog] = useState(false);
   const [tab, setTab] = useState<Tab>("DICE");
@@ -289,10 +291,10 @@ function IngameInterface(props: {
             setState={props.setState}
             CreateSettlement={
               <CreateSettlement
-                key={props.state.rolls.length}
+                key={rollsArray.length}
                 state={props.state}
                 setState={props.setState}
-                turn={props.state.rolls.length - 1}
+                turn={rollsArray.length - 1}
                 playerOnTurn={currentTurn}
               />
             }

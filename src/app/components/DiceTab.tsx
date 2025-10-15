@@ -1,9 +1,10 @@
-import { Divider, Paper, Typography, Box } from "@mui/material";
+import { Divider, Paper, Typography, Box, Button } from "@mui/material";
 import { motion, AnimatePresence } from "motion/react";
 import type { State } from "./App";
 import { DICE_OUTCOMES } from "../lib/diceConstants";
 import { DiceNumber } from "./DiceNumber";
 import { DiceCell } from "./DiceCell";
+import { roll, undo, RealDice, rolls } from "../lib/adaptiveDice";
 
 interface DiceTabProps {
   state: State;
@@ -13,6 +14,27 @@ interface DiceTabProps {
 export function DiceTab(props: DiceTabProps) {
   const numPlayers = props.state.players.length;
   const players = [...props.state.players].reverse();
+  const isRealDice = props.state.diceState.mode === "real-life";
+
+  const handleDiceRoll = () => {
+    const result = roll(props.state.diceState);
+    props.setState((state) => ({
+      ...state,
+      diceState: result.state,
+    }));
+  };
+
+  const handleUndo = () => {
+    const rollsArray = rolls(props.state.diceState);
+    if (rollsArray.length === 0) return;
+
+    const newDiceState = undo(props.state.diceState);
+
+    props.setState((state) => ({
+      ...state,
+      diceState: newDiceState,
+    }));
+  };
 
   // Create array with all rolls + empty padding + next indicator
   const displayCells: Array<{
@@ -20,7 +42,8 @@ export function DiceTab(props: DiceTabProps) {
     value?: number;
     turnNumber: number;
   }> = [];
-  props.state.rolls.forEach((roll, idx) => {
+  const rollsArray = rolls(props.state.diceState);
+  rollsArray.forEach((roll, idx) => {
     displayCells.push({ type: "roll", value: roll, turnNumber: idx + 1 });
   });
 
@@ -46,63 +69,122 @@ export function DiceTab(props: DiceTabProps) {
           px: 2,
         }}
       >
-        <Box
-          sx={{
-            display: "grid",
-            gridTemplateColumns: {
-              xs: "repeat(4, 64px)",
-              sm: "repeat(6, 64px)",
-              md: "repeat(12, 64px)",
-            },
-            gap: 1,
-          }}
-        >
-          {DICE_OUTCOMES.map((outcome) => (
+        {isRealDice ? (
+          // Real dice mode: show manual selection grid
+          <Box
+            sx={{
+              display: "grid",
+              gridTemplateColumns: {
+                xs: "repeat(4, 64px)",
+                sm: "repeat(6, 64px)",
+                md: "repeat(12, 64px)",
+              },
+              gap: 1,
+            }}
+          >
+            {DICE_OUTCOMES.map((outcome) => (
+              <DiceCell
+                key={outcome}
+                size={64}
+                onClick={() => {
+                  // For real-life mode, manually add the selected outcome
+                  if (props.state.diceState.mode === "real-life") {
+                    const dice = new RealDice(props.state.diceState);
+                    dice.addRoll(outcome);
+                    props.setState((state) => ({
+                      ...state,
+                      diceState: dice.toState(),
+                    }));
+                  }
+                }}
+                sx={{
+                  backgroundColor: "grey.100",
+                  "&:hover": {
+                    backgroundColor: "grey.200",
+                  },
+                  "&:active": {
+                    backgroundColor: "primary.light",
+                    transform: "scale(0.95)",
+                  },
+                }}
+              >
+                <DiceNumber value={outcome} variant="button" />
+              </DiceCell>
+            ))}
             <DiceCell
-              key={outcome}
               size={64}
-              onClick={() =>
-                props.setState((state) => ({
-                  ...state,
-                  rolls: state.rolls.concat([outcome]),
-                }))
-              }
+              onClick={handleUndo}
               sx={{
-                backgroundColor: "grey.100",
+                backgroundColor: "background.paper",
+                border: "1px solid",
+                borderColor: "divider",
                 "&:hover": {
-                  backgroundColor: "grey.200",
-                },
-                "&:active": {
-                  backgroundColor: "primary.light",
-                  transform: "scale(0.95)",
+                  backgroundColor: "action.hover",
                 },
               }}
             >
-              <DiceNumber value={outcome} variant="button" />
+              <Typography variant="h5" fontWeight="bold">
+                ↶
+              </Typography>
             </DiceCell>
-          ))}
-          <DiceCell
-            size={64}
-            onClick={() =>
-              props.setState((state) => ({
-                ...state,
-                rolls: state.rolls.slice(0, -1),
-              }))
-            }
+          </Box>
+        ) : (
+          // Adaptive/Shuffle-bag mode: show roll button
+          <Box
             sx={{
-              backgroundColor: "background.paper",
-              border: "1px solid",
-              borderColor: "divider",
-              "&:hover": {
-                backgroundColor: "action.hover",
-              },
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              gap: 3,
             }}
           >
-            <Typography variant="h5" fontWeight="bold">
-              ↶
-            </Typography>
-          </DiceCell>
-        </Box>
+            {/* Show last roll result prominently */}
+            {rollsArray.length > 0 && (
+              <Box sx={{ textAlign: "center" }}>
+                <Typography
+                  variant="caption"
+                  color="text.secondary"
+                  gutterBottom
+                  sx={{ display: "block", mb: 1 }}
+                >
+                  Letzter Wurf
+                </Typography>
+                <DiceCell
+                  size={120}
+                  sx={{
+                    backgroundColor: "background.paper",
+                    border: "3px solid",
+                    borderColor: "primary.main",
+                    boxShadow: 4,
+                  }}
+                >
+                  <DiceNumber value={rollsArray[rollsArray.length - 1]} />
+                </DiceCell>
+              </Box>
+            )}
+
+            <Button
+              variant="contained"
+              size="large"
+              onClick={handleDiceRoll}
+              sx={{
+                minWidth: 200,
+                py: 2,
+                fontSize: "1.2rem",
+              }}
+            >
+              🎲 Würfeln
+            </Button>
+            <Button
+              variant="outlined"
+              size="small"
+              onClick={handleUndo}
+              disabled={rollsArray.length === 0}
+            >
+              ↶ Rückgängig
+            </Button>
+          </Box>
+        )}
       </Box>
       <Divider sx={{ mb: 4 }} />
       <Box sx={{ px: 2, mb: 8 }}>
