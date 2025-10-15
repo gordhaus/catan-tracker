@@ -1,5 +1,6 @@
 "use client";
 import {
+  Box,
   Button,
   Dialog,
   DialogActions,
@@ -20,15 +21,15 @@ import {
   deleteSession,
   downloadState,
   getState,
-  updateState,
+  saveState,
 } from "../localStorage";
 import styles from "../page.module.css";
 import {
   ResourceNumberSelector,
-  type DiceOutcome,
   type Resource,
   type OptionalFieldValue,
 } from "./ResourceNumberSelector";
+import { type DiceOutcome } from "../lib/diceConstants";
 import { DiceTab } from "./DiceTab";
 import { SettlementsTab } from "./SettlementsTab";
 import { StatsTab } from "./StatsTab";
@@ -57,6 +58,11 @@ type Tab = "DICE" | "SETTLEMENTS" | "STATS";
 
 export default function Home() {
   const [state, setState] = React.useState<State>(getState());
+
+  // Automatically sync state to localStorage whenever it changes
+  React.useEffect(() => {
+    saveState(state);
+  }, [state]);
 
   return (
     <div className={styles.page}>
@@ -152,27 +158,22 @@ function CreateSettlement(props: CreateSettlementProps) {
       <Button
         onClick={() => {
           if (player === "") return;
-          updateState(
-            (state) => ({
-              ...state,
-              settlements: state.settlements.concat([
-                {
-                  id:
-                    state.settlements.length === 0
-                      ? 0
-                      : Math.max(
-                          ...state.settlements.map(
-                            (settlement) => settlement.id
-                          )
-                        ) + 1,
-                  turn,
-                  player,
-                  income: removeEmptyIncomes(incomes),
-                },
-              ]),
-            }),
-            props.setState
-          );
+          props.setState((state) => ({
+            ...state,
+            settlements: state.settlements.concat([
+              {
+                id:
+                  state.settlements.length === 0
+                    ? 0
+                    : Math.max(
+                        ...state.settlements.map((settlement) => settlement.id)
+                      ) + 1,
+                turn,
+                player,
+                income: removeEmptyIncomes(incomes),
+              },
+            ]),
+          }));
           resetForm();
         }}
       >
@@ -271,35 +272,41 @@ function IngameInterface(props: {
   return (
     <>
       <TabHeader currentTurn={currentTurn} nextTurn={nextTurn} />
-      <Tabs value={tab} onChange={handleChange} variant="fullWidth">
-        <Tab label="Würfel" value="DICE" />
-        <Tab label="Siedlungen" value="SETTLEMENTS" />
-        <Tab label="Stats" value="STATS" />
-      </Tabs>
-      {tab === "DICE" && (
-        <DiceTab state={props.state} setState={props.setState} />
-      )}
-      {tab === "SETTLEMENTS" && (
-        <SettlementsTab
-          state={props.state}
-          setState={props.setState}
-          CreateSettlement={
-            <CreateSettlement
-              key={props.state.rolls.length}
-              state={props.state}
-              setState={props.setState}
-              turn={props.state.rolls.length - 1}
-              playerOnTurn={currentTurn}
-            />
-          }
-        />
-      )}
-      {tab === "STATS" && (
-        <StatsTab state={props.state} setState={props.setState} />
-      )}
-      <Divider></Divider>
-      <Button onClick={() => downloadState()}>Exportieren</Button>
-      <Button onClick={() => setOpenDialog(true)}>Neue Session</Button>
+      <Box sx={{ mt: 1 }}>
+        <Tabs value={tab} onChange={handleChange} variant="fullWidth">
+          <Tab label="Würfel" value="DICE" />
+          <Tab label="Siedlungen" value="SETTLEMENTS" />
+          <Tab label="Stats" value="STATS" />
+        </Tabs>
+      </Box>
+      <Box sx={{ mt: 4 }}>
+        {tab === "DICE" && (
+          <DiceTab state={props.state} setState={props.setState} />
+        )}
+        {tab === "SETTLEMENTS" && (
+          <SettlementsTab
+            state={props.state}
+            setState={props.setState}
+            CreateSettlement={
+              <CreateSettlement
+                key={props.state.rolls.length}
+                state={props.state}
+                setState={props.setState}
+                turn={props.state.rolls.length - 1}
+                playerOnTurn={currentTurn}
+              />
+            }
+          />
+        )}
+        {tab === "STATS" && (
+          <StatsTab state={props.state} setState={props.setState} />
+        )}
+      </Box>
+      <Box sx={{ mt: 8, display: "flex", flexDirection: "column", gap: 4 }}>
+        <Divider />
+        <Button onClick={() => downloadState()}>Exportieren</Button>
+        <Button onClick={() => setOpenDialog(true)}>Neue Session</Button>
+      </Box>
       <Dialog open={openDialog} onClose={closeDialog}>
         <DialogTitle>Wirklich neue Session?</DialogTitle>
         <DialogContent>

@@ -1,5 +1,4 @@
 import { Box, Button, Divider } from "@mui/material";
-import { updateState } from "../localStorage";
 import type { State } from "./App";
 import type { Resource } from "./ResourceNumberSelector";
 
@@ -42,22 +41,25 @@ export function SettlementsTab(props: SettlementsTabProps) {
                   <div>{`Zug: ${settlement.turn}`}</div>
                   <Button
                     onClick={() =>
-                      updateState((state) => {
+                      props.setState((state) => {
                         const index = state.settlements.findIndex(
                           (element) => element.id === settlement.id
                         );
                         return {
                           ...state,
-                          settlements: [...state.settlements.slice(0, index), ...state.settlements.slice(index + 1)],
+                          settlements: [
+                            ...state.settlements.slice(0, index),
+                            ...state.settlements.slice(index + 1),
+                          ],
                         };
-                      }, props.setState)
+                      })
                     }
                   >
                     Löschen
                   </Button>
                   <Button
                     onClick={() =>
-                      updateState((state) => {
+                      props.setState((state) => {
                         return {
                           ...state,
                           settlements: [
@@ -74,7 +76,7 @@ export function SettlementsTab(props: SettlementsTabProps) {
                             },
                           ],
                         };
-                      }, props.setState)
+                      })
                     }
                   >
                     Stadt

@@ -9,13 +9,8 @@ export function getState(): State {
     : (JSON.parse(storedState) as State);
 }
 
-export function updateState(
-  fn: (oldState: State) => State,
-  stateUpdate: React.Dispatch<React.SetStateAction<State>>
-) {
-  const oldState = getState();
-  window.localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(fn(oldState)));
-  stateUpdate(getState());
+export function saveState(state: State): void {
+  window.localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(state));
 }
 
 export function deleteSession() {

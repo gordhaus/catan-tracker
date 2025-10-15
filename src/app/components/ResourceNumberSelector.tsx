@@ -1,7 +1,5 @@
 import { Box, FormControl, InputLabel, MenuItem, Select } from "@mui/material";
-
-const diceOutcomes = [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12] as const;
-export type DiceOutcome = (typeof diceOutcomes)[number];
+import { DICE_OUTCOMES, type DiceOutcome } from "../lib/diceConstants";
 
 const resources = ["WHEAT", "ORE", "WOOD", "CLAY", "WOOL", "GOLD"] as const;
 export type Resource = (typeof resources)[number];
@@ -58,7 +56,7 @@ export function ResourceNumberSelector(props: ResourceNumberSelectorProps) {
           onChange={(event) => props.onNumberChange(event.target.value)}
           sx={{ width: "150px" }}
         >
-          {diceOutcomes.map((number) => (
+          {DICE_OUTCOMES.map((number) => (
             <MenuItem key={`chip-${props.index}-${number}`} value={number}>
               {number}
             </MenuItem>
